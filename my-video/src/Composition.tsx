@@ -25,7 +25,7 @@ const calculateMetadata: CalculateMetadataFunction<Props> = () => {
 
 // Duración de cada escena, en frames (30 fps)
 const INTRO_DURATION = 60; // 2s
-const SUBTITLE_DURATION = 90; // 3s
+const SUBTITLE_DURATION = 75; // 2.5s
 const OUTRO_DURATION = 60; // 2s
 const CREDITS_DURATION = 60; // 2s
 // Cada crossfade "muerde" frames de las dos escenas que une
