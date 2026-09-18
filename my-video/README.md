@@ -152,6 +152,101 @@ Ejemplo con parámetros ajustados:
 npm run cut-silence -- mi-video.webm --threshold=-35 --min-silence=0.8 --padding=0.1
 ```
 
+### Corrección de color cinematográfica
+
+El prop `videoColorGrade` aplica un "look" profesional sobre tu video **sin
+tocar el archivo original** — es un filtro que se aplica en pantalla (y al
+renderizar), 100% local (filtros CSS estándar, sin LUTs ni servicios
+externos):
+
+- `"none"` (por defecto): sin cambios.
+- `"cinematic"`: más contraste y saturación, un toque de calidez y una
+  viñeta suave en los bordes — el look "cine" clásico.
+- `"warm"`: más cálido (naranja/piel), sin viñeta.
+- `"cool"`: tono más frío/azulado.
+- `"bw"`: blanco y negro con contraste realzado.
+
+Poné `videoColorGrade` en el panel de props (o por `--props`). Combina sin
+problema con zoom, callouts, cortes y subtítulos — se aplica siempre sobre
+el video ya procesado por las demás instrucciones.
+
+### Plan de edición automático: subtítulos solo en las frases importantes
+
+Por defecto, si activás `videoCaptionsFileName`, se muestran *todos* los
+subtítulos transcritos. Para que solo aparezcan en las frases que vos
+decidas importantes, hay un motor de reglas local (`scripts/analyze-video.mjs`,
+**sin ningún LLM ni API** — es un extractor de palabras clave, no
+comprensión de lenguaje natural real):
+
+1. Necesitás haber generado los subtítulos primero (`npm run captions`,
+   ver arriba).
+2. Corré, desde `my-video/`:
+   ```console
+   npm run analyze -- mi-video.webm --keywords="precio,oferta"
+   ```
+   o con una instrucción en texto libre (reconoce patrones simples como
+   "cuando diga/mencione X", "sobre Y"):
+   ```console
+   npm run analyze -- mi-video.webm --instruction="resalta cuando hable de precio o de la oferta"
+   ```
+   Esto agrupa la transcripción en frases y arma
+   `public/mi-video.editplan.json` con las que contienen esas palabras
+   clave. **Si ninguna frase matchea (o no le pasás keywords/instrucción),
+   cae a un modo heurístico**: elige las frases más "sustanciales" del
+   video (ni muletillas sueltas ni monólogos completos), hasta
+   `--max-highlights` (default 5).
+3. En el panel de props, poné `videoEditPlanFileName` como
+   `"mi-video.editplan.json"` — ahora los subtítulos solo se muestran en
+   esas frases. Si lo dejás vacío, se sigue mostrando todo (comportamiento
+   de siempre, sin romper nada).
+
+**Importante — qué tan "inteligente" es esto:** no hay ningún modelo de
+lenguaje interpretando tu instrucción; es un buscador de palabras clave con
+un puñado de patrones fijos. Funciona bien para pedidos concretos ("resalta
+cuando diga X"), no para pedidos abstractos ("resalta lo más
+interesante"). Conectar un LLM de verdad (OpenAI o Anthropic) para eso es
+un paso pendiente, pensado para que puedas probarlo en tu propia máquina.
+
+## Flujo completo recomendado (en tu máquina)
+
+Con todas las funciones juntas, el orden para editar un video real es:
+
+```console
+npm i
+npm run dev
+```
+
+1. Subí tu video a `public/` (pestaña **Assets** del Studio).
+2. **(Opcional) Cortá los silencios:**
+   ```console
+   npm run cut-silence -- mi-video.webm
+   ```
+   → usa `mi-video.cuts.webm` de acá en adelante.
+3. **(Opcional) Generá subtítulos** (necesita tu propia API key de OpenAI):
+   ```console
+   OPENAI_API_KEY="sk-..." npm run captions -- mi-video.cuts.webm
+   ```
+4. **(Opcional) Elegí qué frases destacar:**
+   ```console
+   npm run analyze -- mi-video.cuts.webm --keywords="lo que quieras resaltar"
+   ```
+5. En el panel de props del Studio (ícono `</>`), configurá:
+   - `videoFileName`: `"mi-video.cuts.webm"`
+   - `videoCaptionsFileName`: `"mi-video.cuts.captions.json"`
+   - `videoEditPlanFileName`: `"mi-video.cuts.editplan.json"`
+   - `videoColorGrade`: `"cinematic"` (o el que prefieras)
+   - `videoCalloutType` / `videoCalloutStartSeconds` / etc. si querés una
+     flecha o círculo en algún momento.
+   - `aspectRatio`: `"vertical"` para Reels/Shorts.
+6. Previsualizá en el Studio. Cuando estés conforme, renderizá:
+   ```console
+   npx remotion render MyComp out/video-final.mp4 --props='{"videoFileName":"mi-video.cuts.webm","videoCaptionsFileName":"mi-video.cuts.captions.json","videoEditPlanFileName":"mi-video.cuts.editplan.json","videoColorGrade":"cinematic","aspectRatio":"vertical"}'
+   ```
+   (o copiá el JSON completo de props que armaste en el panel del Studio,
+   con el botón de copiar que tiene al lado).
+7. **Importalo en CapCut** (ver sección de abajo) para los últimos
+   retoques.
+
 ## Exportar para CapCut
 
 CapCut **no tiene un formato de proyecto abierto ni documentado**
