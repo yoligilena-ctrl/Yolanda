@@ -6,6 +6,8 @@ import {
   interpolate,
   spring,
   AbsoluteFill,
+  Audio,
+  staticFile,
 } from "remotion";
 import { TransitionSeries, linearTiming } from "@remotion/transitions";
 import { slide } from "@remotion/transitions/slide";
@@ -57,25 +59,28 @@ export const MyVideo: React.FC<Props> = ({
   outroText,
 }) => {
   return (
-    <TransitionSeries>
-      <TransitionSeries.Sequence durationInFrames={INTRO_DURATION}>
-        <IntroScene titleText={titleText} />
-      </TransitionSeries.Sequence>
-      <TransitionSeries.Transition
-        presentation={slide({ direction: "from-left" })}
-        timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
-      />
-      <TransitionSeries.Sequence durationInFrames={SUBTITLE_DURATION}>
-        <SubtitleScene subtitleText={subtitleText} />
-      </TransitionSeries.Sequence>
-      <TransitionSeries.Transition
-        presentation={slide({ direction: "from-left" })}
-        timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
-      />
-      <TransitionSeries.Sequence durationInFrames={OUTRO_DURATION}>
-        <OutroScene outroText={outroText} />
-      </TransitionSeries.Sequence>
-    </TransitionSeries>
+    <AbsoluteFill>
+      <Audio src={staticFile("music.mp3")} />
+      <TransitionSeries>
+        <TransitionSeries.Sequence durationInFrames={INTRO_DURATION}>
+          <IntroScene titleText={titleText} />
+        </TransitionSeries.Sequence>
+        <TransitionSeries.Transition
+          presentation={slide({ direction: "from-left" })}
+          timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
+        />
+        <TransitionSeries.Sequence durationInFrames={SUBTITLE_DURATION}>
+          <SubtitleScene subtitleText={subtitleText} />
+        </TransitionSeries.Sequence>
+        <TransitionSeries.Transition
+          presentation={slide({ direction: "from-left" })}
+          timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
+        />
+        <TransitionSeries.Sequence durationInFrames={OUTRO_DURATION}>
+          <OutroScene outroText={outroText} />
+        </TransitionSeries.Sequence>
+      </TransitionSeries>
+    </AbsoluteFill>
   );
 };
 
