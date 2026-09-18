@@ -1,13 +1,14 @@
 import {
   CalculateMetadataFunction,
   Composition,
-  Sequence,
   useCurrentFrame,
   useVideoConfig,
   interpolate,
   spring,
   AbsoluteFill,
 } from "remotion";
+import { TransitionSeries, linearTiming } from "@remotion/transitions";
+import { fade } from "@remotion/transitions/fade";
 
 type Props = {
   titleText: string;
@@ -23,7 +24,13 @@ const calculateMetadata: CalculateMetadataFunction<Props> = () => {
 const INTRO_DURATION = 60; // 2s
 const SUBTITLE_DURATION = 90; // 3s
 const OUTRO_DURATION = 60; // 2s
-const TOTAL_DURATION = INTRO_DURATION + SUBTITLE_DURATION + OUTRO_DURATION; // 7s
+// Cada crossfade "muerde" frames de las dos escenas que une
+const TRANSITION_DURATION = 15; // 0.5s
+const TOTAL_DURATION =
+  INTRO_DURATION +
+  SUBTITLE_DURATION +
+  OUTRO_DURATION -
+  2 * TRANSITION_DURATION; // 6s
 
 export const MyComposition = () => {
   return (
@@ -50,20 +57,25 @@ export const MyVideo: React.FC<Props> = ({
   outroText,
 }) => {
   return (
-    <AbsoluteFill>
-      <Sequence durationInFrames={INTRO_DURATION}>
+    <TransitionSeries>
+      <TransitionSeries.Sequence durationInFrames={INTRO_DURATION}>
         <IntroScene titleText={titleText} />
-      </Sequence>
-      <Sequence from={INTRO_DURATION} durationInFrames={SUBTITLE_DURATION}>
+      </TransitionSeries.Sequence>
+      <TransitionSeries.Transition
+        presentation={fade()}
+        timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
+      />
+      <TransitionSeries.Sequence durationInFrames={SUBTITLE_DURATION}>
         <SubtitleScene subtitleText={subtitleText} />
-      </Sequence>
-      <Sequence
-        from={INTRO_DURATION + SUBTITLE_DURATION}
-        durationInFrames={OUTRO_DURATION}
-      >
+      </TransitionSeries.Sequence>
+      <TransitionSeries.Transition
+        presentation={fade()}
+        timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
+      />
+      <TransitionSeries.Sequence durationInFrames={OUTRO_DURATION}>
         <OutroScene outroText={outroText} />
-      </Sequence>
-    </AbsoluteFill>
+      </TransitionSeries.Sequence>
+    </TransitionSeries>
   );
 };
 
@@ -122,13 +134,9 @@ const SubtitleScene: React.FC<{ subtitleText: string }> = ({
     to: 0,
   });
 
-  // Se desvanece un poco antes de terminar la escena
-  const opacity = interpolate(
-    frame,
-    [0, 15, SUBTITLE_DURATION - 15, SUBTITLE_DURATION],
-    [0, 1, 1, 0],
-    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
-  );
+  const opacity = interpolate(frame, [0, 15], [0, 1], {
+    extrapolateRight: "clamp",
+  });
 
   return (
     <AbsoluteFill
