@@ -69,6 +69,13 @@ edición, sin tocar código:
   (ej. `1.5` = 50% más cerca). `videoZoomDurationSeconds` en `0`
   desactiva el efecto (por defecto). El zoom siempre centra en medio
   del cuadro; hace ease in/out, no es un salto brusco.
+- `videoCalloutType` (`"arrow"` o `"circle"`), `videoCalloutStartSeconds`,
+  `videoCalloutDurationSeconds`, `videoCalloutXPercent`/`YPercent`
+  (posición, 0-100), `videoCalloutDirection` (`"up"`/`"down"`/`"left"`/`"right"`,
+  solo para `arrow`), `videoCalloutText` (etiqueta opcional): flecha o
+  círculo resaltado en un momento y lugar del video, con pulso continuo
+  mientras está visible. `videoCalloutDurationSeconds` en `0` desactiva
+  el efecto (por defecto).
 
 La duración de la escena se recalcula sola con cada instrucción —
 por ejemplo, si recortas el video a 3 segundos o le pones velocidad
