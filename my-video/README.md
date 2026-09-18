@@ -63,6 +63,12 @@ edición, sin tocar código:
   doble de rápido, `0.5` mitad de velocidad).
 - `videoOverlayText`: texto que aparece superpuesto abajo del video
   (vacío = sin overlay).
+- `videoZoomStartSeconds` / `videoZoomDurationSeconds` /
+  `videoZoomScale`: zoom ("punch-in") manual en un momento del video
+  ya recortado — cuándo empieza, cuánto dura y a qué escala llega
+  (ej. `1.5` = 50% más cerca). `videoZoomDurationSeconds` en `0`
+  desactiva el efecto (por defecto). El zoom siempre centra en medio
+  del cuadro; hace ease in/out, no es un salto brusco.
 
 La duración de la escena se recalcula sola con cada instrucción —
 por ejemplo, si recortas el video a 3 segundos o le pones velocidad
