@@ -51,6 +51,23 @@ entre el título y el subtítulo:
 4. El Studio recalcula automáticamente la duración total del video
    según la duración real de tu archivo — no hay que tocar código.
 
+### Transformar el video con instrucciones
+
+En ese mismo panel de props puedes agregar estas "instrucciones" de
+edición, sin tocar código:
+
+- `videoTrimStartSeconds` / `videoTrimEndSeconds`: recorta el video
+  (segundos a saltar desde el inicio / hasta dónde llegar). `0` en
+  `videoTrimEndSeconds` significa "hasta el final real del archivo".
+- `videoPlaybackRate`: velocidad de reproducción (`1` normal, `2`
+  doble de rápido, `0.5` mitad de velocidad).
+- `videoOverlayText`: texto que aparece superpuesto abajo del video
+  (vacío = sin overlay).
+
+La duración de la escena se recalcula sola con cada instrucción —
+por ejemplo, si recortas el video a 3 segundos o le pones velocidad
+2x, el resto del video (transiciones, música) se ajusta automático.
+
 **Importante sobre formatos:** en este entorno de sandbox, el
 navegador headless usado para previsualizar y renderizar no tiene
 soporte para H.264 (`.mp4` común de celulares/cámaras). Usa
