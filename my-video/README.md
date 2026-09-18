@@ -207,6 +207,43 @@ cuando diga X"), no para pedidos abstractos ("resalta lo más
 interesante"). Conectar un LLM de verdad (OpenAI o Anthropic) para eso es
 un paso pendiente, pensado para que puedas probarlo en tu propia máquina.
 
+### B-roll: insertar tus propios clips/imágenes de apoyo
+
+El prop `videoBRollFileName` inserta videos o imágenes propias en momentos
+puntuales del video, relacionados con lo que estás contando — por ejemplo,
+un gráfico mientras hablás de un dato, o un clip de apoyo que corta a otra
+toma por un par de segundos.
+
+**No hay selección automática de contenido**: no puedo "entender" tu video
+ni elegir qué imagen poner — la lista de inserciones la armás vos a mano.
+
+1. Subí tus clips/imágenes de apoyo a `public/` (igual que el video
+   principal, por la pestaña **Assets** del Studio).
+2. Creá un archivo `public/mi-video.broll.json` con la lista de
+   inserciones:
+   ```json
+   {
+     "insertions": [
+       { "assetFileName": "grafico-precios.png", "startSeconds": 3.5, "durationSeconds": 2.5, "style": "pip", "xPercent": 75, "yPercent": 75, "widthPercent": 30 },
+       { "assetFileName": "clip-apoyo.webm", "startSeconds": 8.0, "durationSeconds": 3.0, "style": "full" }
+     ]
+   }
+   ```
+   - `startSeconds` / `durationSeconds`: cuándo y cuánto dura, relativo al
+     video ya recortado (igual que el zoom/callout, no al archivo original).
+   - `style`: `"full"` tapa toda la pantalla (cutaway — el audio del video
+     principal sigue sonando abajo); `"pip"` lo muestra en un recuadro
+     superpuesto en una esquina, sin tapar el video principal.
+   - `xPercent` / `yPercent` / `widthPercent` (solo para `"pip"`, todos
+     opcionales): posición y tamaño del recuadro, en porcentaje del cuadro.
+   - Acepta imágenes (`.png`/`.jpg`/`.jpeg`/`.webp`/`.gif`) o
+     video (cualquier otra extensión, ej. `.webm`).
+3. En el panel de props, poné `videoBRollFileName` como
+   `"mi-video.broll.json"`.
+
+El B-roll se ve afectado por `videoColorGrade` igual que el video
+principal, para que el look quede parejo.
+
 ## Flujo completo recomendado (en tu máquina)
 
 Con todas las funciones juntas, el orden para editar un video real es:
@@ -230,21 +267,24 @@ npm run dev
    ```console
    npm run analyze -- mi-video.cuts.webm --keywords="lo que quieras resaltar"
    ```
-5. En el panel de props del Studio (ícono `</>`), configurá:
+5. **(Opcional) Armá tu `mi-video.cuts.broll.json`** con los clips/imágenes
+   de apoyo que quieras insertar (ver sección de B-roll más arriba).
+6. En el panel de props del Studio (ícono `</>`), configurá:
    - `videoFileName`: `"mi-video.cuts.webm"`
    - `videoCaptionsFileName`: `"mi-video.cuts.captions.json"`
    - `videoEditPlanFileName`: `"mi-video.cuts.editplan.json"`
+   - `videoBRollFileName`: `"mi-video.cuts.broll.json"`
    - `videoColorGrade`: `"cinematic"` (o el que prefieras)
    - `videoCalloutType` / `videoCalloutStartSeconds` / etc. si querés una
      flecha o círculo en algún momento.
    - `aspectRatio`: `"vertical"` para Reels/Shorts.
-6. Previsualizá en el Studio. Cuando estés conforme, renderizá:
+7. Previsualizá en el Studio. Cuando estés conforme, renderizá:
    ```console
-   npx remotion render MyComp out/video-final.mp4 --props='{"videoFileName":"mi-video.cuts.webm","videoCaptionsFileName":"mi-video.cuts.captions.json","videoEditPlanFileName":"mi-video.cuts.editplan.json","videoColorGrade":"cinematic","aspectRatio":"vertical"}'
+   npx remotion render MyComp out/video-final.mp4 --props='{"videoFileName":"mi-video.cuts.webm","videoCaptionsFileName":"mi-video.cuts.captions.json","videoEditPlanFileName":"mi-video.cuts.editplan.json","videoBRollFileName":"mi-video.cuts.broll.json","videoColorGrade":"cinematic","aspectRatio":"vertical"}'
    ```
    (o copiá el JSON completo de props que armaste en el panel del Studio,
    con el botón de copiar que tiene al lado).
-7. **Importalo en CapCut** (ver sección de abajo) para los últimos
+8. **Importalo en CapCut** (ver sección de abajo) para los últimos
    retoques.
 
 ## Exportar para CapCut
