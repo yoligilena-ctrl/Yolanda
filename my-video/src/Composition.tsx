@@ -15,8 +15,16 @@ import {
   continueRender,
   cancelRender,
 } from "remotion";
-import { TransitionSeries, linearTiming } from "@remotion/transitions";
+import {
+  TransitionSeries,
+  linearTiming,
+  TransitionPresentation,
+} from "@remotion/transitions";
 import { slide } from "@remotion/transitions/slide";
+import { fade } from "@remotion/transitions/fade";
+import { wipe } from "@remotion/transitions/wipe";
+import { flip } from "@remotion/transitions/flip";
+import { none } from "@remotion/transitions/none";
 import { getVideoMetadata } from "@remotion/media-utils";
 import { Caption, createTikTokStyleCaptions } from "@remotion/captions";
 
@@ -42,6 +50,14 @@ type Props = {
   videoZoomStartSeconds: number;
   videoZoomDurationSeconds: number;
   videoZoomScale: number;
+  // Movimiento de cámara simulado (zoom + paneo), con varios "beats"
+  // posibles a lo largo del video: nombre del archivo
+  // <video>.cameramoves.json en public/ (ver README). Vacío = se usa el
+  // zoom simple de arriba (videoZoomStartSeconds/etc, centrado, un solo
+  // momento) sin cambios. Con el archivo puesto, ese zoom simple se
+  // ignora y se usan los beats del plan en su lugar (pueden apuntar a
+  // cualquier punto del cuadro, no solo el centro).
+  videoCameraMovesFileName: string;
   // Flecha o círculo resaltado sobre el video, en un momento y posición
   // dados. videoCalloutDurationSeconds = 0 desactiva el efecto (por
   // defecto). Posición en porcentaje del cuadro (0-100).
@@ -81,6 +97,18 @@ type Props = {
   // CapCut para TikTok/Reels/Shorts; "square" (1:1) para feed de
   // Instagram; "landscape" (16:9, por defecto) para YouTube/web.
   aspectRatio: "landscape" | "vertical" | "square";
+  // Transición entre las escenas de la composición (intro, video propio,
+  // subtítulo, cierre, créditos). "slide" (por defecto, igual que antes)
+  // es un deslizamiento desde la izquierda. "auto" va alternando entre
+  // varios estilos en cada corte, para que no se sienta repetitivo sin
+  // tener que elegir a mano.
+  sceneTransitionStyle:
+    | "slide"
+    | "fade"
+    | "wipe"
+    | "flip"
+    | "none"
+    | "auto";
 };
 
 const FPS = 30;
@@ -123,6 +151,39 @@ const COLOR_GRADE_FILTERS: Record<Props["videoColorGrade"], string> = {
   warm: "contrast(1.05) saturate(1.15) brightness(1.06) sepia(0.2) hue-rotate(-8deg)",
   cool: "contrast(1.08) saturate(1.1) brightness(1.0) hue-rotate(10deg)",
   bw: "grayscale(1) contrast(1.15) brightness(1.05)",
+};
+
+// Ciclo usado por "auto": va alternando estilos en cada corte entre
+// escenas, para que la edición no se sienta repetitiva sin tener que
+// elegir un estilo a mano en cada video.
+const AUTO_TRANSITION_CYCLE: Exclude<Props["sceneTransitionStyle"], "auto">[] = [
+  "slide",
+  "fade",
+  "wipe",
+  "flip",
+];
+
+const getTransitionPresentation = (
+  style: Props["sceneTransitionStyle"],
+  transitionIndex: number,
+): TransitionPresentation<any> => {
+  const resolvedStyle =
+    style === "auto"
+      ? AUTO_TRANSITION_CYCLE[transitionIndex % AUTO_TRANSITION_CYCLE.length]
+      : style;
+  switch (resolvedStyle) {
+    case "fade":
+      return fade();
+    case "wipe":
+      return wipe({ direction: "from-left" });
+    case "flip":
+      return flip({ direction: "from-left" });
+    case "none":
+      return none();
+    case "slide":
+    default:
+      return slide({ direction: "from-left" });
+  }
 };
 
 const calculateMetadata: CalculateMetadataFunction<Props> = async ({
@@ -187,6 +248,7 @@ export const MyComposition = () => {
         videoZoomStartSeconds: 0,
         videoZoomDurationSeconds: 0,
         videoZoomScale: 1.5,
+        videoCameraMovesFileName: "",
         videoCalloutType: "arrow",
         videoCalloutStartSeconds: 0,
         videoCalloutDurationSeconds: 0,
@@ -200,6 +262,7 @@ export const MyComposition = () => {
         videoBRollFileName: "",
         userVideoDurationInFrames: 0,
         aspectRatio: "landscape",
+        sceneTransitionStyle: "slide",
       }}
       calculateMetadata={calculateMetadata}
     />
@@ -218,6 +281,7 @@ export const MyVideo: React.FC<Props> = ({
   videoZoomStartSeconds,
   videoZoomDurationSeconds,
   videoZoomScale,
+  videoCameraMovesFileName,
   videoCalloutType,
   videoCalloutStartSeconds,
   videoCalloutDurationSeconds,
@@ -230,6 +294,7 @@ export const MyVideo: React.FC<Props> = ({
   videoColorGrade,
   videoBRollFileName,
   userVideoDurationInFrames,
+  sceneTransitionStyle,
 }) => {
   const hasUserVideo = userVideoDurationInFrames > 0;
   const totalDuration =
@@ -256,7 +321,7 @@ export const MyVideo: React.FC<Props> = ({
           <IntroScene titleText={titleText} />
         </TransitionSeries.Sequence>
         <TransitionSeries.Transition
-          presentation={slide({ direction: "from-left" })}
+          presentation={getTransitionPresentation(sceneTransitionStyle, 0)}
           timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
         />
         {hasUserVideo && (
@@ -272,6 +337,7 @@ export const MyVideo: React.FC<Props> = ({
                 zoomStartSeconds={videoZoomStartSeconds}
                 zoomDurationSeconds={videoZoomDurationSeconds}
                 zoomScale={videoZoomScale}
+                cameraMovesFileName={videoCameraMovesFileName}
                 calloutType={videoCalloutType}
                 calloutStartSeconds={videoCalloutStartSeconds}
                 calloutDurationSeconds={videoCalloutDurationSeconds}
@@ -286,7 +352,7 @@ export const MyVideo: React.FC<Props> = ({
               />
             </TransitionSeries.Sequence>
             <TransitionSeries.Transition
-              presentation={slide({ direction: "from-left" })}
+              presentation={getTransitionPresentation(sceneTransitionStyle, 1)}
               timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
             />
           </>
@@ -295,14 +361,14 @@ export const MyVideo: React.FC<Props> = ({
           <SubtitleScene subtitleText={subtitleText} />
         </TransitionSeries.Sequence>
         <TransitionSeries.Transition
-          presentation={slide({ direction: "from-left" })}
+          presentation={getTransitionPresentation(sceneTransitionStyle, 2)}
           timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
         />
         <TransitionSeries.Sequence durationInFrames={OUTRO_DURATION}>
           <OutroScene outroText={outroText} />
         </TransitionSeries.Sequence>
         <TransitionSeries.Transition
-          presentation={slide({ direction: "from-left" })}
+          presentation={getTransitionPresentation(sceneTransitionStyle, 3)}
           timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
         />
         <TransitionSeries.Sequence durationInFrames={CREDITS_DURATION}>
@@ -435,6 +501,106 @@ const OutroScene: React.FC<{ outroText: string }> = ({ outroText }) => {
   );
 };
 
+type CameraMoveBeat = {
+  startSeconds: number;
+  durationSeconds: number;
+  scale: number;
+  panXPercent?: number;
+  panYPercent?: number;
+};
+type CameraMovesPlan = { beats: CameraMoveBeat[] };
+
+// Movimiento de cámara simulado (zoom + paneo), con varios "beats"
+// posibles a lo largo del video — ver <video>.cameramoves.json en el
+// README. Cuando fileName está vacío no hace ningún fetch y devuelve el
+// estado neutro de inmediato (sin afectar el zoom simple existente).
+const useCameraMoves = (
+  fileName: string,
+): { scale: number; translateXPercent: number; translateYPercent: number } => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const [plan, setPlan] = useState<CameraMovesPlan | null>(null);
+
+  useEffect(() => {
+    if (!fileName) {
+      setPlan(null);
+      return;
+    }
+    const handle = delayRender(`Cargando movimientos de cámara: ${fileName}`);
+    let cancelled = false;
+
+    fetch(staticFile(fileName))
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`No se pudo cargar ${fileName} (HTTP ${res.status})`);
+        }
+        return res.json();
+      })
+      .then((data: CameraMovesPlan) => {
+        if (!cancelled) {
+          setPlan(data);
+        }
+        continueRender(handle);
+      })
+      .catch((err) => {
+        cancelRender(err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fileName]);
+
+  const neutral = { scale: 1, translateXPercent: 0, translateYPercent: 0 };
+
+  if (!fileName || !plan) {
+    return neutral;
+  }
+
+  const active = plan.beats.find((beat) => {
+    const startFrame = Math.round(Math.max(0, beat.startSeconds) * fps);
+    const durationFrames = Math.round(Math.max(0, beat.durationSeconds) * fps);
+    return frame >= startFrame && frame < startFrame + durationFrames;
+  });
+
+  if (!active) {
+    return neutral;
+  }
+
+  const startFrame = Math.round(Math.max(0, active.startSeconds) * fps);
+  const durationFrames = Math.round(Math.max(0, active.durationSeconds) * fps);
+  const endFrame = startFrame + durationFrames;
+  const easeFrames = Math.min(10, Math.floor(durationFrames / 3));
+
+  const scale = interpolate(
+    frame,
+    [startFrame, startFrame + easeFrames, endFrame - easeFrames, endFrame],
+    [1, active.scale, active.scale, 1],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  const panXPercent = active.panXPercent ?? 50;
+  const panYPercent = active.panYPercent ?? 50;
+
+  // A escala 1 (sin zoom) no hay margen para panear — el offset crece con
+  // la escala, hasta el valor pedido cuando el beat está en su punto
+  // máximo, y vuelve a 0 al terminar (mismo ease que la escala).
+  const panProgress = interpolate(
+    frame,
+    [startFrame, startFrame + easeFrames, endFrame - easeFrames, endFrame],
+    [0, 1, 1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+  const maxOffsetXPercent = ((50 - panXPercent) / 50) * ((active.scale - 1) / active.scale) * 50;
+  const maxOffsetYPercent = ((50 - panYPercent) / 50) * ((active.scale - 1) / active.scale) * 50;
+
+  return {
+    scale,
+    translateXPercent: maxOffsetXPercent * panProgress,
+    translateYPercent: maxOffsetYPercent * panProgress,
+  };
+};
+
 // Escena de video propio: el archivo subido por el usuario a public/
 // (vía el panel "Assets" del Studio), mostrado a pantalla completa, con
 // las "instrucciones" de edición (recorte, velocidad, texto) aplicadas.
@@ -446,6 +612,7 @@ const UserVideoScene: React.FC<{
   zoomStartSeconds: number;
   zoomDurationSeconds: number;
   zoomScale: number;
+  cameraMovesFileName: string;
   calloutType: "arrow" | "circle";
   calloutStartSeconds: number;
   calloutDurationSeconds: number;
@@ -465,6 +632,7 @@ const UserVideoScene: React.FC<{
   zoomStartSeconds,
   zoomDurationSeconds,
   zoomScale,
+  cameraMovesFileName,
   calloutType,
   calloutStartSeconds,
   calloutDurationSeconds,
@@ -485,13 +653,15 @@ const UserVideoScene: React.FC<{
     extrapolateRight: "clamp",
   });
 
-  // Zoom ("punch-in") manual: ease in, se mantiene, ease out. Desactivado
-  // cuando la duración es 0 (el estado por defecto).
+  // Zoom ("punch-in") manual simple: ease in, se mantiene, ease out.
+  // Desactivado cuando la duración es 0 (el estado por defecto), o cuando
+  // hay un plan de movimientos de cámara (cameraMovesFileName) — en ese
+  // caso el plan manda.
   const zoomStartFrame = Math.round(Math.max(0, zoomStartSeconds) * fps);
   const zoomDurationFrames = Math.round(Math.max(0, zoomDurationSeconds) * fps);
   const zoomEndFrame = zoomStartFrame + zoomDurationFrames;
   const zoomEaseFrames = Math.min(10, Math.floor(zoomDurationFrames / 3));
-  const videoScale =
+  const simpleZoomScale =
     zoomDurationFrames > 0
       ? interpolate(
           frame,
@@ -506,6 +676,15 @@ const UserVideoScene: React.FC<{
         )
       : 1;
 
+  const cameraMoves = useCameraMoves(cameraMovesFileName);
+  const videoScale = cameraMovesFileName ? cameraMoves.scale : simpleZoomScale;
+  const videoTranslateXPercent = cameraMovesFileName
+    ? cameraMoves.translateXPercent
+    : 0;
+  const videoTranslateYPercent = cameraMovesFileName
+    ? cameraMoves.translateYPercent
+    : 0;
+
   return (
     <AbsoluteFill style={{ backgroundColor: "black", opacity, overflow: "hidden" }}>
       <Video
@@ -516,7 +695,7 @@ const UserVideoScene: React.FC<{
           width: "100%",
           height: "100%",
           objectFit: "contain",
-          transform: `scale(${videoScale})`,
+          transform: `scale(${videoScale}) translate(${videoTranslateXPercent}%, ${videoTranslateYPercent}%)`,
           filter: COLOR_GRADE_FILTERS[colorGrade],
         }}
       />

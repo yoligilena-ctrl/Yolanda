@@ -81,6 +81,49 @@ La duración de la escena se recalcula sola con cada instrucción —
 por ejemplo, si recortas el video a 3 segundos o le pones velocidad
 2x, el resto del video (transiciones, música) se ajusta automático.
 
+### Movimiento de cámara simulado (zoom + paneo, varios momentos)
+
+El zoom simple (`videoZoomStartSeconds`/etc de arriba) siempre apunta al
+centro y es un solo momento. Para varios "beats" de zoom que además
+paneen hacia cualquier punto del cuadro (no solo el centro) — más parecido
+a un movimiento de cámara real — usá `videoCameraMovesFileName`:
+
+1. Creá `public/mi-video.cameramoves.json`:
+   ```json
+   {
+     "beats": [
+       { "startSeconds": 1.0, "durationSeconds": 2.0, "scale": 1.8, "panXPercent": 80, "panYPercent": 30 },
+       { "startSeconds": 5.0, "durationSeconds": 1.5, "scale": 1.4, "panXPercent": 20, "panYPercent": 70 }
+     ]
+   }
+   ```
+   - `scale`: qué tan cerca llega (`1` = sin zoom).
+   - `panXPercent` / `panYPercent` (opcionales, `50`/`50` = centro): hacia
+     qué punto del cuadro apunta la cámara, en porcentaje (0-100). Solo se
+     nota el paneo cuando `scale` > 1 — no hay margen para panear sin
+     zoom, igual que en una cámara real.
+   - Cada beat hace ease in/out solo (vuelve a `scale: 1` centrado entre
+     beats), igual que el zoom simple.
+2. En el panel de props, poné `videoCameraMovesFileName` como
+   `"mi-video.cameramoves.json"` — esto **reemplaza** al zoom simple
+   mientras esté puesto (si lo dejás vacío, el zoom simple sigue
+   funcionando igual que siempre).
+
+### Transiciones dinámicas entre escenas
+
+`sceneTransitionStyle` controla cómo se cortan las escenas de la
+composición (título → video → subtítulo → cierre → créditos):
+
+- `"slide"` (por defecto, igual que siempre): deslizamiento desde la
+  izquierda.
+- `"fade"`: fundido cruzado.
+- `"wipe"`: barrido con borde duro.
+- `"flip"`: vuelta en 3D.
+- `"none"`: corte seco, sin animación.
+- `"auto"`: va alternando entre `slide`/`fade`/`wipe`/`flip` en cada
+  corte, para que la edición tenga variedad sin tener que elegir un
+  estilo a mano.
+
 ### Subtítulos animados (con la API de Whisper de OpenAI)
 
 1. Necesitás [ffmpeg](https://ffmpeg.org/) instalado en tu máquina y una
@@ -274,13 +317,16 @@ npm run dev
    - `videoCaptionsFileName`: `"mi-video.cuts.captions.json"`
    - `videoEditPlanFileName`: `"mi-video.cuts.editplan.json"`
    - `videoBRollFileName`: `"mi-video.cuts.broll.json"`
+   - `videoCameraMovesFileName`: `"mi-video.cuts.cameramoves.json"` (o dejá
+     el zoom simple de siempre)
    - `videoColorGrade`: `"cinematic"` (o el que prefieras)
    - `videoCalloutType` / `videoCalloutStartSeconds` / etc. si querés una
      flecha o círculo en algún momento.
+   - `sceneTransitionStyle`: `"auto"` para variedad automática entre cortes
    - `aspectRatio`: `"vertical"` para Reels/Shorts.
 7. Previsualizá en el Studio. Cuando estés conforme, renderizá:
    ```console
-   npx remotion render MyComp out/video-final.mp4 --props='{"videoFileName":"mi-video.cuts.webm","videoCaptionsFileName":"mi-video.cuts.captions.json","videoEditPlanFileName":"mi-video.cuts.editplan.json","videoBRollFileName":"mi-video.cuts.broll.json","videoColorGrade":"cinematic","aspectRatio":"vertical"}'
+   npx remotion render MyComp out/video-final.mp4 --props='{"videoFileName":"mi-video.cuts.webm","videoCaptionsFileName":"mi-video.cuts.captions.json","videoEditPlanFileName":"mi-video.cuts.editplan.json","videoBRollFileName":"mi-video.cuts.broll.json","videoCameraMovesFileName":"mi-video.cuts.cameramoves.json","videoColorGrade":"cinematic","sceneTransitionStyle":"auto","aspectRatio":"vertical"}'
    ```
    (o copiá el JSON completo de props que armaste en el panel del Studio,
    con el botón de copiar que tiene al lado).
