@@ -44,7 +44,7 @@ export const MyComposition = () => {
       width={1280}
       height={720}
       defaultProps={{
-        titleText: "Yolanda Video Generator",
+        titleText: "Generador de Videos",
         subtitleText: "Hecho 100% con código",
         outroText: "¡Nos vemos pronto!",
       }}
