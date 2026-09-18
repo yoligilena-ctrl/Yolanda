@@ -115,7 +115,7 @@ export const MyVideo: React.FC<Props> = ({
           interpolate(
             frame,
             [0, totalDuration - 10, totalDuration],
-            [0, 0.3, 0],
+            [0, 0.4, 0],
             { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
           )
         }
