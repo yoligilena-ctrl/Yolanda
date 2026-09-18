@@ -74,6 +74,36 @@ soporte para H.264 (`.mp4` común de celulares/cámaras). Usa
 `.webm` (VP8/VP9) para que funcione aquí. En tu propia máquina, con
 Chrome normal, `.mp4` debería funcionar sin problemas.
 
+## Exportar para CapCut
+
+CapCut **no tiene un formato de proyecto abierto ni documentado**
+que se pueda generar desde afuera (su `.draft` interno es propietario
+y no publica ningún SDK o spec) — así que no es posible crear un
+"proyecto de CapCut" editable con las escenas como capas separadas
+desde este repositorio.
+
+Lo que sí funciona, y es como se usa CapCut en la práctica con
+material externo: exportar un `.mp4` estándar (H.264 + AAC, que es
+justo lo que ya generamos) e importarlo a CapCut como un clip más,
+igual que cualquier video grabado con el celular. Desde ahí puedes
+seguir editando dentro de CapCut normalmente.
+
+Para eso, el prop `aspectRatio` controla el formato de salida:
+
+- `"landscape"` (por defecto): 1280×720, 16:9 — YouTube/web.
+- `"vertical"`: 720×1280, 9:16 — el formato que CapCut usa para
+  TikTok/Reels/Shorts.
+- `"square"`: 1080×1080, 1:1 — feed de Instagram.
+
+Cámbialo en el panel de props del Studio, o al renderizar por CLI:
+
+```console
+npx remotion render MyComp out/video.mp4 --props='{"aspectRatio":"vertical"}'
+```
+
+Los tamaños de texto de las escenas se ajustan solos según el
+formato elegido.
+
 ## Docs
 
 Get started with Remotion by reading the [fundamentals page](https://www.remotion.dev/docs/the-fundamentals).
