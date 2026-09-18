@@ -34,9 +34,26 @@ type Props = {
   // Calculado automáticamente en calculateMetadata a partir del archivo real
   // y las instrucciones de recorte/velocidad; no se edita a mano.
   userVideoDurationInFrames: number;
+  // Formato de salida. "vertical" (9:16) es el que suele importarse a
+  // CapCut para TikTok/Reels/Shorts; "square" (1:1) para feed de
+  // Instagram; "landscape" (16:9, por defecto) para YouTube/web.
+  aspectRatio: "landscape" | "vertical" | "square";
 };
 
 const FPS = 30;
+
+const DIMENSIONS: Record<Props["aspectRatio"], { width: number; height: number }> = {
+  landscape: { width: 1280, height: 720 },
+  vertical: { width: 720, height: 1280 },
+  square: { width: 1080, height: 1080 },
+};
+
+// Los tamaños de fuente de las escenas están calibrados para el ancho
+// "landscape" (1280px); esto los escala proporcionalmente en vertical/square.
+const useTextScale = () => {
+  const { width } = useVideoConfig();
+  return width / DIMENSIONS.landscape.width;
+};
 
 // Duración de cada escena, en frames (30 fps)
 const INTRO_DURATION = 90; // 3s
@@ -59,6 +76,7 @@ const calculateMetadata: CalculateMetadataFunction<Props> = async ({
   if (!props.videoFileName) {
     return {
       durationInFrames: BASE_DURATION,
+      ...DIMENSIONS[props.aspectRatio],
       props: { ...props, userVideoDurationInFrames: 0 },
     };
   }
@@ -87,6 +105,7 @@ const calculateMetadata: CalculateMetadataFunction<Props> = async ({
     // Se agrega una escena y una transición más cuando hay video propio.
     durationInFrames:
       BASE_DURATION + userVideoDurationInFrames - TRANSITION_DURATION,
+    ...DIMENSIONS[props.aspectRatio],
     props: { ...props, userVideoDurationInFrames },
   };
 };
@@ -111,6 +130,7 @@ export const MyComposition = () => {
         videoPlaybackRate: 1,
         videoOverlayText: "",
         userVideoDurationInFrames: 0,
+        aspectRatio: "landscape",
       }}
       calculateMetadata={calculateMetadata}
     />
@@ -200,6 +220,7 @@ export const MyVideo: React.FC<Props> = ({
 const IntroScene: React.FC<{ titleText: string }> = ({ titleText }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const textScale = useTextScale();
 
   const scale = spring({
     frame,
@@ -224,7 +245,7 @@ const IntroScene: React.FC<{ titleText: string }> = ({ titleText }) => {
           transform: `scale(${scale})`,
           opacity,
           color: "white",
-          fontSize: 70,
+          fontSize: 70 * textScale,
           fontWeight: "bold",
           fontFamily: "sans-serif",
           textAlign: "center",
@@ -242,6 +263,7 @@ const SubtitleScene: React.FC<{ subtitleText: string }> = ({
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const textScale = useTextScale();
 
   const translateY = spring({
     frame,
@@ -268,7 +290,7 @@ const SubtitleScene: React.FC<{ subtitleText: string }> = ({
           transform: `translateY(${translateY}px)`,
           opacity,
           color: "#8ecbff",
-          fontSize: 46,
+          fontSize: 46 * textScale,
           fontWeight: 600,
           fontFamily: "sans-serif",
           textAlign: "center",
@@ -284,6 +306,7 @@ const SubtitleScene: React.FC<{ subtitleText: string }> = ({
 const OutroScene: React.FC<{ outroText: string }> = ({ outroText }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const textScale = useTextScale();
 
   const scale = spring({
     frame,
@@ -303,7 +326,7 @@ const OutroScene: React.FC<{ outroText: string }> = ({ outroText }) => {
         style={{
           transform: `scale(${scale})`,
           color: "white",
-          fontSize: 60,
+          fontSize: 60 * textScale,
           fontWeight: "bold",
           fontFamily: "sans-serif",
           textAlign: "center",
@@ -326,6 +349,7 @@ const UserVideoScene: React.FC<{
 }> = ({ videoFileName, trimStartSeconds, playbackRate, overlayText }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
+  const textScale = useTextScale();
 
   const opacity = interpolate(frame, [0, 15], [0, 1], {
     extrapolateRight: "clamp",
@@ -350,7 +374,7 @@ const UserVideoScene: React.FC<{
           <div
             style={{
               color: "white",
-              fontSize: 44,
+              fontSize: 44 * textScale,
               fontWeight: "bold",
               fontFamily: "sans-serif",
               textAlign: "center",
@@ -369,6 +393,7 @@ const UserVideoScene: React.FC<{
 // Escena 4: créditos finales, fundido suave sobre fondo oscuro
 const CreditsScene: React.FC<{ creditsText: string }> = ({ creditsText }) => {
   const frame = useCurrentFrame();
+  const textScale = useTextScale();
 
   const opacity = interpolate(frame, [0, 20], [0, 1], {
     extrapolateRight: "clamp",
@@ -386,7 +411,7 @@ const CreditsScene: React.FC<{ creditsText: string }> = ({ creditsText }) => {
         style={{
           opacity,
           color: "#8a93ab",
-          fontSize: 36,
+          fontSize: 36 * textScale,
           fontWeight: 500,
           fontFamily: "sans-serif",
           textAlign: "center",
