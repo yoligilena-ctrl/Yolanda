@@ -24,10 +24,10 @@ const calculateMetadata: CalculateMetadataFunction<Props> = () => {
 };
 
 // Duración de cada escena, en frames (30 fps)
-const INTRO_DURATION = 60; // 2s
-const SUBTITLE_DURATION = 75; // 2.5s
-const OUTRO_DURATION = 60; // 2s
-const CREDITS_DURATION = 60; // 2s
+const INTRO_DURATION = 90; // 3s
+const SUBTITLE_DURATION = 105; // 3.5s
+const OUTRO_DURATION = 90; // 3s
+const CREDITS_DURATION = 90; // 3s
 // Cada crossfade "muerde" frames de las dos escenas que une
 const TRANSITION_DURATION = 15; // 0.5s
 const TOTAL_DURATION =
@@ -35,7 +35,7 @@ const TOTAL_DURATION =
   SUBTITLE_DURATION +
   OUTRO_DURATION +
   CREDITS_DURATION -
-  3 * TRANSITION_DURATION; // 7.5s
+  3 * TRANSITION_DURATION; // 11s
 
 export const MyComposition = () => {
   return (
