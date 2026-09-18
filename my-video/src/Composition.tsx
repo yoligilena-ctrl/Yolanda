@@ -16,6 +16,7 @@ type Props = {
   titleText: string;
   subtitleText: string;
   outroText: string;
+  creditsText: string;
 };
 
 const calculateMetadata: CalculateMetadataFunction<Props> = () => {
@@ -26,13 +27,15 @@ const calculateMetadata: CalculateMetadataFunction<Props> = () => {
 const INTRO_DURATION = 60; // 2s
 const SUBTITLE_DURATION = 90; // 3s
 const OUTRO_DURATION = 60; // 2s
+const CREDITS_DURATION = 60; // 2s
 // Cada crossfade "muerde" frames de las dos escenas que une
 const TRANSITION_DURATION = 15; // 0.5s
 const TOTAL_DURATION =
   INTRO_DURATION +
   SUBTITLE_DURATION +
-  OUTRO_DURATION -
-  2 * TRANSITION_DURATION; // 6s
+  OUTRO_DURATION +
+  CREDITS_DURATION -
+  3 * TRANSITION_DURATION; // 7.5s
 
 export const MyComposition = () => {
   return (
@@ -47,6 +50,7 @@ export const MyComposition = () => {
         titleText: "Generador de Videos",
         subtitleText: "Hecho 100% con código",
         outroText: "¡Hasta la próxima!",
+        creditsText: "Hecho con Remotion",
       }}
       calculateMetadata={calculateMetadata}
     />
@@ -57,6 +61,7 @@ export const MyVideo: React.FC<Props> = ({
   titleText,
   subtitleText,
   outroText,
+  creditsText,
 }) => {
   return (
     <AbsoluteFill>
@@ -88,6 +93,13 @@ export const MyVideo: React.FC<Props> = ({
         />
         <TransitionSeries.Sequence durationInFrames={OUTRO_DURATION}>
           <OutroScene outroText={outroText} />
+        </TransitionSeries.Sequence>
+        <TransitionSeries.Transition
+          presentation={slide({ direction: "from-left" })}
+          timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
+        />
+        <TransitionSeries.Sequence durationInFrames={CREDITS_DURATION}>
+          <CreditsScene creditsText={creditsText} />
         </TransitionSeries.Sequence>
       </TransitionSeries>
     </AbsoluteFill>
@@ -208,6 +220,38 @@ const OutroScene: React.FC<{ outroText: string }> = ({ outroText }) => {
         }}
       >
         {outroText}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// Escena 4: créditos finales, fundido suave sobre fondo oscuro
+const CreditsScene: React.FC<{ creditsText: string }> = ({ creditsText }) => {
+  const frame = useCurrentFrame();
+
+  const opacity = interpolate(frame, [0, 20], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <AbsoluteFill
+      style={{
+        backgroundColor: "#0b1020",
+        justifyContent: "center",
+        alignItems: "center",
+      }}
+    >
+      <div
+        style={{
+          opacity,
+          color: "#8a93ab",
+          fontSize: 36,
+          fontWeight: 500,
+          fontFamily: "sans-serif",
+          textAlign: "center",
+        }}
+      >
+        {creditsText}
       </div>
     </AbsoluteFill>
   );
