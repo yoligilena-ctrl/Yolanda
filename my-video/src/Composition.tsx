@@ -46,7 +46,7 @@ export const MyComposition = () => {
       defaultProps={{
         titleText: "Generador de Videos",
         subtitleText: "Hecho 100% con código",
-        outroText: "¡Nos vemos pronto!",
+        outroText: "¡Hasta la próxima!",
       }}
       calculateMetadata={calculateMetadata}
     />
