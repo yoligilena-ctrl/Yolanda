@@ -17,6 +17,7 @@
 
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { groupIntoPhrases } from "./lib/group-phrases.mjs";
 
 function parseArgs(argv) {
   const [videoFileName, ...rest] = argv;
@@ -60,46 +61,6 @@ function extractKeywordsFromInstruction(instruction) {
     found.push(...words);
   }
   return [...new Set(found)];
-}
-
-// Agrupa las palabras transcritas (Caption[], con espacios al inicio como
-// las genera @remotion/openai-whisper) en frases, cortando cuando hay un
-// silencio >= 700ms o una frase ya lleva más de 4000ms — mismos umbrales
-// que usa createTikTokStyleCaptions en Composition.tsx, para que la
-// agrupación del análisis coincida con la que se ve en pantalla.
-const BREAK_ON_SILENCE_MS = 700;
-const MAX_PHRASE_MS = 4000;
-
-function groupIntoPhrases(captions) {
-  const phrases = [];
-  let current = [];
-
-  for (const caption of captions) {
-    if (current.length === 0) {
-      current.push(caption);
-      continue;
-    }
-    const prev = current[current.length - 1];
-    const gap = caption.startMs - prev.endMs;
-    const phraseDuration = caption.endMs - current[0].startMs;
-    // Un pageBreakAfter explícito en la palabra anterior fuerza el corte,
-    // igual que hace createTikTokStyleCaptions al renderizar en pantalla
-    // (así el agrupamiento del análisis coincide con lo que se ve).
-    if (prev.pageBreakAfter || gap >= BREAK_ON_SILENCE_MS || phraseDuration >= MAX_PHRASE_MS) {
-      phrases.push(current);
-      current = [caption];
-    } else {
-      current.push(caption);
-    }
-  }
-  if (current.length > 0) phrases.push(current);
-
-  return phrases.map((words) => ({
-    text: words.map((w) => w.text).join("").trim(),
-    startMs: words[0].startMs,
-    endMs: words[words.length - 1].endMs,
-    wordCount: words.length,
-  }));
 }
 
 function scorePhrase(phrase, keywords) {

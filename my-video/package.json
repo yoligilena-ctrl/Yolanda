@@ -32,7 +32,8 @@
     "lint": "eslint src && tsc",
     "captions": "node scripts/generate-captions.mjs",
     "cut-silence": "node scripts/cut-silence.mjs",
-    "analyze": "node scripts/analyze-video.mjs"
+    "analyze": "node scripts/analyze-video.mjs",
+    "ai-edit-plan": "node scripts/ai-edit-plan.mjs"
   },
   "sideEffects": [
     "*.css"

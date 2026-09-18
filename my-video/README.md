@@ -247,8 +247,46 @@ comprensión de lenguaje natural real):
 lenguaje interpretando tu instrucción; es un buscador de palabras clave con
 un puñado de patrones fijos. Funciona bien para pedidos concretos ("resalta
 cuando diga X"), no para pedidos abstractos ("resalta lo más
-interesante"). Conectar un LLM de verdad (OpenAI o Anthropic) para eso es
-un paso pendiente, pensado para que puedas probarlo en tu propia máquina.
+interesante"). Para eso, ver la sección siguiente.
+
+### Motor de instrucciones con IA real (API de Anthropic/Claude)
+
+A diferencia del motor de reglas de arriba, `scripts/ai-edit-plan.mjs` usa
+un modelo de lenguaje de verdad (Claude) para leer la transcripción
+completa y entender instrucciones abstractas ("resalta lo más importante
+para alguien que nunca vio el video", "encontrá los momentos más
+graciosos"), no solo palabras clave. Además de elegir subtítulos
+importantes, puede sugerir zooms/paneos y un callout.
+
+1. Necesitás una [API key de Anthropic](https://console.anthropic.com/settings/keys)
+   y haber generado los subtítulos primero (`npm run captions`).
+2. Corré, desde `my-video/`:
+   ```console
+   ANTHROPIC_API_KEY="sk-ant-..." npm run ai-edit-plan -- mi-video.webm --instruction="resalta los momentos más importantes y poné una flecha cuando mencione el precio"
+   ```
+3. Esto escribe **los mismos archivos que ya usan las otras funciones** —
+   no hace falta ningún prop nuevo:
+   - `public/mi-video.editplan.json` (mismo formato que genera
+     `npm run analyze`) → usalo en `videoEditPlanFileName`.
+   - `public/mi-video.cameramoves.json`, si la IA sugirió algún zoom/paneo
+     → usalo en `videoCameraMovesFileName`.
+   - Si sugiere un callout, los valores se imprimen en la consola para que
+     los copies en `videoCalloutType`/`videoCalloutStartSeconds`/etc.
+
+**Cómo evita que la IA invente cosas:** el modelo nunca elige el texto ni
+los tiempos de los subtítulos — solo elige *índices* de una lista numerada
+de frases reales (extraídas localmente de tu transcripción), y esos
+índices son lo único que se usa para armar el resultado final. Los
+números de zoom/paneo/callout que sí genera se acotan siempre a los
+límites válidos del video antes de guardarlos (no se guardan tal cual si
+son absurdos).
+
+**Importante:** esto se verificó con respuestas simuladas (mockeadas) y
+contra la API real de Anthropic con una key inválida (para confirmar que
+el pedido llega bien formado y el error se maneja) — `api.anthropic.com`
+sí es alcanzable desde este entorno de sandbox, a diferencia de
+`api.openai.com`, pero no se probó con una key real ni una respuesta real
+del modelo. Probalo en tu máquina con tu propia `ANTHROPIC_API_KEY`.
 
 ### B-roll: insertar tus propios clips/imágenes de apoyo
 
@@ -306,9 +344,14 @@ npm run dev
    ```console
    OPENAI_API_KEY="sk-..." npm run captions -- mi-video.cuts.webm
    ```
-4. **(Opcional) Elegí qué frases destacar:**
+4. **(Opcional) Elegí qué frases destacar** — con reglas locales:
    ```console
    npm run analyze -- mi-video.cuts.webm --keywords="lo que quieras resaltar"
+   ```
+   o con IA real, para instrucciones más abstractas (necesita tu propia
+   `ANTHROPIC_API_KEY`; también puede sugerir zoom/paneo/callout):
+   ```console
+   ANTHROPIC_API_KEY="sk-ant-..." npm run ai-edit-plan -- mi-video.cuts.webm --instruction="resalta lo más importante"
    ```
 5. **(Opcional) Armá tu `mi-video.cuts.broll.json`** con los clips/imágenes
    de apoyo que quieras insertar (ver sección de B-roll más arriba).
