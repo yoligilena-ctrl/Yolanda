@@ -8,7 +8,7 @@ import {
   AbsoluteFill,
 } from "remotion";
 import { TransitionSeries, linearTiming } from "@remotion/transitions";
-import { fade } from "@remotion/transitions/fade";
+import { slide } from "@remotion/transitions/slide";
 
 type Props = {
   titleText: string;
@@ -62,14 +62,14 @@ export const MyVideo: React.FC<Props> = ({
         <IntroScene titleText={titleText} />
       </TransitionSeries.Sequence>
       <TransitionSeries.Transition
-        presentation={fade()}
+        presentation={slide({ direction: "from-right" })}
         timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
       />
       <TransitionSeries.Sequence durationInFrames={SUBTITLE_DURATION}>
         <SubtitleScene subtitleText={subtitleText} />
       </TransitionSeries.Sequence>
       <TransitionSeries.Transition
-        presentation={fade()}
+        presentation={slide({ direction: "from-right" })}
         timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
       />
       <TransitionSeries.Sequence durationInFrames={OUTRO_DURATION}>
