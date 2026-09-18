@@ -51,6 +51,30 @@ entre el título y el subtítulo:
 4. El Studio recalcula automáticamente la duración total del video
    según la duración real de tu archivo — no hay que tocar código.
 
+### Videos largos (5, 10, 20+ minutos)
+
+No hay ningún límite de duración puesto a propósito en este proyecto —
+está probado con videos de hasta ~66 minutos (generados sintéticamente,
+ver más abajo). Si un video largo "no se detecta" o falla, la causa casi
+siempre es esta:
+
+**El formato del archivo.** El navegador headless que usa este proyecto
+para previsualizar/renderizar no reproduce H.264 ni HEVC (los códecs que
+usa la mayoría de los celulares) — sin importar la duración. Con un video
+corto esto se nota como pantalla negra; con uno largo puede verse como
+"no lo detecta" o un error confuso. Desde esta versión, si pasa esto vas
+a ver un mensaje claro indicando el problema y qué hacer, en vez de un
+error críptico del navegador. La solución siempre es la misma: convertirlo
+antes con ffmpeg:
+```console
+ffmpeg -i mi-video.mp4 -c:v libvpx-vp9 -pix_fmt yuv420p -crf 30 -b:v 0 -c:a libopus mi-video.webm
+```
+y usar `mi-video.webm` en `videoFileName`.
+
+Con el archivo ya en un formato soportado, la duración deja de ser un
+problema — el Studio detecta la duración real sin importar cuántos
+minutos tenga.
+
 ### Transformar el video con instrucciones
 
 En ese mismo panel de props puedes agregar estas "instrucciones" de
@@ -144,6 +168,19 @@ voz**; en los silencios no se muestra nada. Si le pusiste recorte
 (`videoTrimStartSeconds`) o velocidad (`videoPlaybackRate`) al video, la
 sincronización de los subtítulos se ajusta sola.
 
+**Videos largos:** la API de Whisper rechaza archivos de audio de más de
+25MB (límite de OpenAI, no de este proyecto) — un video de más o menos
+50 minutos, según qué tan comprimido esté. El script extrae el audio a
+un bitrate fijo y bajo (64kbps mono, de sobra para que Whisper entienda
+la voz) para que ese límite quede bien lejos, y si aun así lo supera,
+**corta el audio en varias partes automáticamente**, las transcribe una
+por una, y las pega ajustando los tiempos para que la sincronización con
+el video original se mantenga correcta de punta a punta — no hace falta
+que hagas nada distinto, solo vas a ver más líneas de progreso en la
+consola ("Transcribiendo parte 2/3..."). Único costo: la palabra exacta
+justo en el corte entre una parte y la siguiente puede salir levemente
+distinta a como saldría en una sola pasada.
+
 **Importante:** `api.openai.com` está bloqueado en este entorno de
 sandbox (mismo tipo de restricción de red que bloquea Hugging Face y
 GitHub Releases), así que `npm run captions` no va a funcionar acá —
@@ -176,6 +213,10 @@ ffmpeg, sin ninguna API externa**, así que funciona en cualquier entorno:
    `"mi-video.cuts.webm"` — el resto de las instrucciones (zoom,
    callouts, subtítulos, overlay) funcionan igual sobre el video ya
    recortado.
+
+Probado con videos de hasta 66 minutos sin problemas — vas a ver el
+progreso tramo por tramo en la consola ("Tramo 4/37...") para que sepas
+que sigue trabajando en videos largos con muchos cortes.
 
 Parámetros opcionales:
 

@@ -166,7 +166,7 @@ const AUTO_TRANSITION_CYCLE: Exclude<Props["sceneTransitionStyle"], "auto">[] = 
 const getTransitionPresentation = (
   style: Props["sceneTransitionStyle"],
   transitionIndex: number,
-): TransitionPresentation<any> => {
+): TransitionPresentation<Record<string, unknown>> => {
   const resolvedStyle =
     style === "auto"
       ? AUTO_TRANSITION_CYCLE[transitionIndex % AUTO_TRANSITION_CYCLE.length]
@@ -197,9 +197,22 @@ const calculateMetadata: CalculateMetadataFunction<Props> = async ({
     };
   }
 
-  const { durationInSeconds } = await getVideoMetadata(
-    staticFile(props.videoFileName),
-  );
+  let durationInSeconds: number;
+  try {
+    ({ durationInSeconds } = await getVideoMetadata(
+      staticFile(props.videoFileName),
+    ));
+  } catch (err) {
+    // Causa típica: el archivo está en un formato/códec que el navegador
+    // headless no puede leer (H.264 o HEVC de un celular, por ejemplo) —
+    // convertilo a VP9/webm con ffmpeg primero (ver README, sección
+    // "Usar tu propio video").
+    throw new Error(
+      `No se pudo leer "${props.videoFileName}" (${(err as Error).message ?? err}). ` +
+        `¿Es un formato soportado? Si es .mp4 con H.264/HEVC (típico de celular), convertilo antes a ` +
+        `VP9/webm con ffmpeg — ver la sección "Usar tu propio video" del README.`,
+    );
+  }
 
   // Aplica las instrucciones de recorte antes de calcular cuánto dura
   // realmente la escena.
