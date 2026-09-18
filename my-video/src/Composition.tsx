@@ -60,7 +60,17 @@ export const MyVideo: React.FC<Props> = ({
 }) => {
   return (
     <AbsoluteFill>
-      <Audio src={staticFile("music.mp3")} />
+      <Audio
+        src={staticFile("music.mp3")}
+        volume={(frame) =>
+          // Sube poco a poco durante casi todo el video y se
+          // desvanece rápido en los últimos frames para evitar un corte seco.
+          interpolate(frame, [0, TOTAL_DURATION - 10, TOTAL_DURATION], [0, 1, 0], {
+            extrapolateLeft: "clamp",
+            extrapolateRight: "clamp",
+          })
+        }
+      />
       <TransitionSeries>
         <TransitionSeries.Sequence durationInFrames={INTRO_DURATION}>
           <IntroScene titleText={titleText} />
