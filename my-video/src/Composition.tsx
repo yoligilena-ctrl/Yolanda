@@ -70,7 +70,7 @@ export const MyVideo: React.FC<Props> = ({
         volume={(frame) =>
           // Sube poco a poco durante casi todo el video y se
           // desvanece rápido en los últimos frames para evitar un corte seco.
-          interpolate(frame, [0, TOTAL_DURATION - 10, TOTAL_DURATION], [0, 0.3, 0], {
+          interpolate(frame, [0, TOTAL_DURATION - 10, TOTAL_DURATION], [0, 0.4, 0], {
             extrapolateLeft: "clamp",
             extrapolateRight: "clamp",
           })
