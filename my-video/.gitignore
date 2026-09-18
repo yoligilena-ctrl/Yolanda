@@ -6,7 +6,8 @@ dist
 # Ignore the output video from Git but not videos you import into src/.
 out
 
-# Tu video real subido a public/ (contenido personal): se queda local para
-# que sigas iterando, pero nunca se commitea/sube al repo sin que lo pidas.
-public/mi-video.webm
-public/mi-video.cameramoves.json
+# Tus videos reales subidos a public/ (contenido personal) y cualquier
+# archivo derivado (cortes, subtítulos, planes de cámara/B-roll): quedan
+# locales para que sigas iterando, pero nunca se commitean/suben al repo
+# sin que lo pidas.
+public/mi-video*
