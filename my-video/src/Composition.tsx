@@ -31,6 +31,11 @@ type Props = {
   videoPlaybackRate: number;
   // Texto superpuesto sobre el video (vacío = sin overlay).
   videoOverlayText: string;
+  // Zoom ("punch-in") en un momento del video, relativo al clip ya
+  // recortado. videoZoomDurationSeconds = 0 desactiva el efecto.
+  videoZoomStartSeconds: number;
+  videoZoomDurationSeconds: number;
+  videoZoomScale: number;
   // Calculado automáticamente en calculateMetadata a partir del archivo real
   // y las instrucciones de recorte/velocidad; no se edita a mano.
   userVideoDurationInFrames: number;
@@ -129,6 +134,9 @@ export const MyComposition = () => {
         videoTrimEndSeconds: 0,
         videoPlaybackRate: 1,
         videoOverlayText: "",
+        videoZoomStartSeconds: 0,
+        videoZoomDurationSeconds: 0,
+        videoZoomScale: 1.5,
         userVideoDurationInFrames: 0,
         aspectRatio: "landscape",
       }}
@@ -146,6 +154,9 @@ export const MyVideo: React.FC<Props> = ({
   videoTrimStartSeconds,
   videoPlaybackRate,
   videoOverlayText,
+  videoZoomStartSeconds,
+  videoZoomDurationSeconds,
+  videoZoomScale,
   userVideoDurationInFrames,
 }) => {
   const hasUserVideo = userVideoDurationInFrames > 0;
@@ -186,6 +197,9 @@ export const MyVideo: React.FC<Props> = ({
                 trimStartSeconds={videoTrimStartSeconds}
                 playbackRate={videoPlaybackRate}
                 overlayText={videoOverlayText}
+                zoomStartSeconds={videoZoomStartSeconds}
+                zoomDurationSeconds={videoZoomDurationSeconds}
+                zoomScale={videoZoomScale}
               />
             </TransitionSeries.Sequence>
             <TransitionSeries.Transition
@@ -346,7 +360,18 @@ const UserVideoScene: React.FC<{
   trimStartSeconds: number;
   playbackRate: number;
   overlayText: string;
-}> = ({ videoFileName, trimStartSeconds, playbackRate, overlayText }) => {
+  zoomStartSeconds: number;
+  zoomDurationSeconds: number;
+  zoomScale: number;
+}> = ({
+  videoFileName,
+  trimStartSeconds,
+  playbackRate,
+  overlayText,
+  zoomStartSeconds,
+  zoomDurationSeconds,
+  zoomScale,
+}) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const textScale = useTextScale();
@@ -355,13 +380,39 @@ const UserVideoScene: React.FC<{
     extrapolateRight: "clamp",
   });
 
+  // Zoom ("punch-in") manual: ease in, se mantiene, ease out. Desactivado
+  // cuando la duración es 0 (el estado por defecto).
+  const zoomStartFrame = Math.round(Math.max(0, zoomStartSeconds) * fps);
+  const zoomDurationFrames = Math.round(Math.max(0, zoomDurationSeconds) * fps);
+  const zoomEndFrame = zoomStartFrame + zoomDurationFrames;
+  const zoomEaseFrames = Math.min(10, Math.floor(zoomDurationFrames / 3));
+  const videoScale =
+    zoomDurationFrames > 0
+      ? interpolate(
+          frame,
+          [
+            zoomStartFrame,
+            zoomStartFrame + zoomEaseFrames,
+            zoomEndFrame - zoomEaseFrames,
+            zoomEndFrame,
+          ],
+          [1, zoomScale, zoomScale, 1],
+          { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+        )
+      : 1;
+
   return (
-    <AbsoluteFill style={{ backgroundColor: "black", opacity }}>
+    <AbsoluteFill style={{ backgroundColor: "black", opacity, overflow: "hidden" }}>
       <Video
         src={staticFile(videoFileName)}
         trimBefore={Math.round(Math.max(0, trimStartSeconds) * fps)}
         playbackRate={playbackRate > 0 ? playbackRate : 1}
-        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          transform: `scale(${videoScale})`,
+        }}
       />
       {overlayText && (
         <AbsoluteFill
