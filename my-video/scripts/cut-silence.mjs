@@ -10,9 +10,13 @@
 // Requiere ffmpeg instalado y en el PATH.
 
 import { existsSync, writeFileSync, mkdtempSync, rmSync } from "node:fs";
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import path from "node:path";
 import os from "node:os";
+import {
+  runFfmpegCaptured,
+  parseFfmpegDurationSeconds,
+} from "./lib/ffmpeg-duration.mjs";
 
 function parseArgs(argv) {
   const [videoFileName, ...rest] = argv;
@@ -45,17 +49,9 @@ const ext = path.extname(videoFileName);
 const baseName = videoFileName.slice(0, -ext.length);
 const outputPath = path.join(publicDir, `${baseName}.cuts${ext}`);
 
-function runFfmpeg(args) {
-  // ffmpeg imprime toda la info que necesitamos (duración, eventos de
-  // silencedetect) en stderr, tanto si termina bien como si falla —
-  // spawnSync siempre nos da ese stderr, a diferencia de execFileSync
-  // cuando el proceso termina con código 0.
-  const result = spawnSync("ffmpeg", args, { encoding: "utf8" });
-  return result.stderr ?? "";
-}
-
 console.log(`Analizando silencios en ${videoFileName}...`);
-const analysisOutput = runFfmpeg([
+const analysisOutput = runFfmpegCaptured([
+  "-hide_banner",
   "-i",
   inputPath,
   "-vn",
@@ -66,18 +62,15 @@ const analysisOutput = runFfmpeg([
   "-",
 ]);
 
-const durationMatch = analysisOutput.match(
-  /Duration:\s*(\d+):(\d+):(\d+\.?\d*)/,
-);
-if (!durationMatch) {
+const duration = parseFfmpegDurationSeconds(analysisOutput);
+if (duration === null) {
   console.error("No se pudo leer la duración del video. Salida de ffmpeg:");
   console.error(analysisOutput);
   process.exit(1);
 }
-const duration =
-  Number(durationMatch[1]) * 3600 +
-  Number(durationMatch[2]) * 60 +
-  Number(durationMatch[3]);
+console.log(
+  `Duración detectada: ${(duration / 60).toFixed(1)} min (${duration.toFixed(1)}s).`,
+);
 
 const starts = [...analysisOutput.matchAll(/silence_start:\s*([\d.]+)/g)].map(
   (m) => Number(m[1]),
@@ -155,10 +148,16 @@ const segmentPaths = finalSegments.map((_, i) => path.join(tempDir, `seg${i}${ex
 
 console.log(`Generando ${finalSegments.length} tramo(s)...`);
 finalSegments.forEach((seg, i) => {
+  console.log(
+    `  Tramo ${i + 1}/${finalSegments.length} (${seg.start.toFixed(1)}s-${seg.end.toFixed(1)}s)...`,
+  );
   execFileSync(
     "ffmpeg",
     [
       "-y",
+      "-hide_banner",
+      "-loglevel",
+      "warning",
       "-i",
       inputPath,
       "-ss",
@@ -181,7 +180,21 @@ writeFileSync(
 console.log("Uniendo los tramos...");
 execFileSync(
   "ffmpeg",
-  ["-y", "-f", "concat", "-safe", "0", "-i", concatListPath, "-c", "copy", outputPath],
+  [
+    "-y",
+    "-hide_banner",
+    "-loglevel",
+    "warning",
+    "-f",
+    "concat",
+    "-safe",
+    "0",
+    "-i",
+    concatListPath,
+    "-c",
+    "copy",
+    outputPath,
+  ],
   { stdio: "inherit" },
 );
 
