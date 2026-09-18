@@ -6,8 +6,10 @@
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
+    "@remotion/captions": "^4.0.526",
     "@remotion/cli": "4.0.526",
     "@remotion/media-utils": "^4.0.526",
+    "@remotion/openai-whisper": "^4.0.526",
     "@remotion/tailwind-v4": "4.0.526",
     "@remotion/transitions": "^4.0.526",
     "react": "19.2.3",
@@ -27,7 +29,8 @@
     "dev": "remotion studio",
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
-    "lint": "eslint src && tsc"
+    "lint": "eslint src && tsc",
+    "captions": "node scripts/generate-captions.mjs"
   },
   "sideEffects": [
     "*.css"

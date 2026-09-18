@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import {
   CalculateMetadataFunction,
   Composition,
@@ -9,10 +10,14 @@ import {
   Audio,
   Video,
   staticFile,
+  delayRender,
+  continueRender,
+  cancelRender,
 } from "remotion";
 import { TransitionSeries, linearTiming } from "@remotion/transitions";
 import { slide } from "@remotion/transitions/slide";
 import { getVideoMetadata } from "@remotion/media-utils";
+import { Caption, createTikTokStyleCaptions } from "@remotion/captions";
 
 type Props = {
   titleText: string;
@@ -46,6 +51,12 @@ type Props = {
   videoCalloutYPercent: number;
   videoCalloutDirection: "up" | "down" | "left" | "right";
   videoCalloutText: string;
+  // Subtítulos animados: nombre del archivo <nombre>.captions.json en
+  // public/ (generado con `npm run captions -- <video>`, que llama a la
+  // API de Whisper de OpenAI). Vacío = sin subtítulos. Se muestran
+  // agrupados por frase/pausa natural, solo mientras hay voz — no todo
+  // el video tiene texto encima todo el tiempo.
+  videoCaptionsFileName: string;
   // Calculado automáticamente en calculateMetadata a partir del archivo real
   // y las instrucciones de recorte/velocidad; no se edita a mano.
   userVideoDurationInFrames: number;
@@ -154,6 +165,7 @@ export const MyComposition = () => {
         videoCalloutYPercent: 50,
         videoCalloutDirection: "up",
         videoCalloutText: "",
+        videoCaptionsFileName: "",
         userVideoDurationInFrames: 0,
         aspectRatio: "landscape",
       }}
@@ -181,6 +193,7 @@ export const MyVideo: React.FC<Props> = ({
   videoCalloutYPercent,
   videoCalloutDirection,
   videoCalloutText,
+  videoCaptionsFileName,
   userVideoDurationInFrames,
 }) => {
   const hasUserVideo = userVideoDurationInFrames > 0;
@@ -231,6 +244,7 @@ export const MyVideo: React.FC<Props> = ({
                 calloutYPercent={videoCalloutYPercent}
                 calloutDirection={videoCalloutDirection}
                 calloutText={videoCalloutText}
+                captionsFileName={videoCaptionsFileName}
               />
             </TransitionSeries.Sequence>
             <TransitionSeries.Transition
@@ -401,6 +415,7 @@ const UserVideoScene: React.FC<{
   calloutYPercent: number;
   calloutDirection: "up" | "down" | "left" | "right";
   calloutText: string;
+  captionsFileName: string;
 }> = ({
   videoFileName,
   trimStartSeconds,
@@ -416,6 +431,7 @@ const UserVideoScene: React.FC<{
   calloutYPercent,
   calloutDirection,
   calloutText,
+  captionsFileName,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -491,6 +507,13 @@ const UserVideoScene: React.FC<{
         direction={calloutDirection}
         text={calloutText}
       />
+      {captionsFileName && (
+        <AnimatedCaptions
+          captionsFileName={captionsFileName}
+          trimStartSeconds={trimStartSeconds}
+          playbackRate={playbackRate > 0 ? playbackRate : 1}
+        />
+      )}
     </AbsoluteFill>
   );
 };
@@ -607,6 +630,124 @@ const VideoCallout: React.FC<{
             {text}
           </div>
         )}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+// Subtítulos animados estilo TikTok, generados a partir de un archivo
+// <video>.captions.json en public/ (ver scripts/generate-captions.mjs,
+// que llama a la API de Whisper de OpenAI). Se agrupan por frase/pausa
+// natural y solo aparecen mientras hay voz — no todo el video tiene
+// texto encima todo el tiempo.
+const AnimatedCaptions: React.FC<{
+  captionsFileName: string;
+  trimStartSeconds: number;
+  playbackRate: number;
+}> = ({ captionsFileName, trimStartSeconds, playbackRate }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const textScale = useTextScale();
+  const [captions, setCaptions] = useState<Caption[] | null>(null);
+
+  useEffect(() => {
+    const handle = delayRender(`Cargando subtítulos: ${captionsFileName}`);
+    let cancelled = false;
+
+    fetch(staticFile(captionsFileName))
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(
+            `No se pudo cargar ${captionsFileName} (HTTP ${res.status})`,
+          );
+        }
+        return res.json();
+      })
+      .then((data: Caption[]) => {
+        if (!cancelled) {
+          setCaptions(data);
+        }
+        continueRender(handle);
+      })
+      .catch((err) => {
+        cancelRender(err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [captionsFileName]);
+
+  if (!captions || captions.length === 0) {
+    return null;
+  }
+
+  const { pages } = createTikTokStyleCaptions({
+    captions,
+    // Corta una página nueva si hay un silencio de 700ms o más entre
+    // palabras (así los subtítulos no cubren pausas largas sin voz).
+    breakOnSilenceAfterMilliseconds: 700,
+    // Techo de seguridad: fuerza un corte si una página lleva más de
+    // 4s acumuladas sin encontrar un silencio (frases muy largas).
+    combineTokensWithinMilliseconds: 4000,
+  });
+
+  // Los timestamps de los subtítulos son del archivo original sin
+  // recortar; hay que convertir el frame actual de la escena a "tiempo
+  // dentro del archivo original" aplicando el recorte y la velocidad.
+  const originalMs =
+    trimStartSeconds * 1000 + (frame / fps) * 1000 * playbackRate;
+
+  const activePage = pages.find(
+    (page) =>
+      originalMs >= page.startMs &&
+      originalMs < page.startMs + page.durationMs,
+  );
+
+  if (!activePage) {
+    return null;
+  }
+
+  return (
+    <AbsoluteFill
+      style={{
+        justifyContent: "flex-end",
+        alignItems: "center",
+        paddingBottom: 140,
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          flexWrap: "wrap",
+          justifyContent: "center",
+          gap: `${4 * textScale}px ${10 * textScale}px`,
+          maxWidth: "85%",
+          padding: `${10 * textScale}px ${18 * textScale}px`,
+          backgroundColor: "rgba(0,0,0,0.55)",
+          borderRadius: 12,
+        }}
+      >
+        {activePage.tokens.map((token, index) => {
+          const isActive =
+            originalMs >= token.fromMs && originalMs < token.toMs;
+          return (
+            <span
+              key={`${token.fromMs}-${index}`}
+              style={{
+                fontSize: 40 * textScale,
+                fontWeight: "bold",
+                fontFamily: "sans-serif",
+                color: isActive ? "#ffd23f" : "white",
+                transform: isActive ? "scale(1.08)" : "scale(1)",
+                display: "inline-block",
+                textShadow: "0 2px 8px rgba(0,0,0,0.85)",
+              }}
+            >
+              {token.text}
+            </span>
+          );
+        })}
       </div>
     </AbsoluteFill>
   );
