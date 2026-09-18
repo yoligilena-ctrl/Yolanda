@@ -62,14 +62,14 @@ export const MyVideo: React.FC<Props> = ({
         <IntroScene titleText={titleText} />
       </TransitionSeries.Sequence>
       <TransitionSeries.Transition
-        presentation={slide({ direction: "from-top" })}
+        presentation={slide({ direction: "from-bottom" })}
         timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
       />
       <TransitionSeries.Sequence durationInFrames={SUBTITLE_DURATION}>
         <SubtitleScene subtitleText={subtitleText} />
       </TransitionSeries.Sequence>
       <TransitionSeries.Transition
-        presentation={slide({ direction: "from-top" })}
+        presentation={slide({ direction: "from-bottom" })}
         timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
       />
       <TransitionSeries.Sequence durationInFrames={OUTRO_DURATION}>
