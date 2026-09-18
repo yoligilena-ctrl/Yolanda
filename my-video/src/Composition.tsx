@@ -22,8 +22,17 @@ type Props = {
   // Nombre del archivo subido a public/ (vía el panel "Assets" del Studio).
   // Vacío = no hay video propio, esa escena simplemente no aparece.
   videoFileName: string;
-  // Calculado automáticamente en calculateMetadata a partir del archivo real;
-  // no se edita a mano.
+  // --- "Instrucciones" de edición sobre el video propio ---
+  // Recorta el video: segundos a saltar desde el inicio / hasta dónde llegar
+  // (0 = sin recorte / hasta el final real del archivo).
+  videoTrimStartSeconds: number;
+  videoTrimEndSeconds: number;
+  // Velocidad de reproducción (1 = normal, 2 = doble, 0.5 = mitad).
+  videoPlaybackRate: number;
+  // Texto superpuesto sobre el video (vacío = sin overlay).
+  videoOverlayText: string;
+  // Calculado automáticamente en calculateMetadata a partir del archivo real
+  // y las instrucciones de recorte/velocidad; no se edita a mano.
   userVideoDurationInFrames: number;
 };
 
@@ -57,9 +66,21 @@ const calculateMetadata: CalculateMetadataFunction<Props> = async ({
   const { durationInSeconds } = await getVideoMetadata(
     staticFile(props.videoFileName),
   );
+
+  // Aplica las instrucciones de recorte antes de calcular cuánto dura
+  // realmente la escena.
+  const trimStart = Math.max(0, props.videoTrimStartSeconds || 0);
+  const trimEnd =
+    props.videoTrimEndSeconds > 0
+      ? Math.min(props.videoTrimEndSeconds, durationInSeconds)
+      : durationInSeconds;
+  const trimmedDurationSeconds = Math.max(0.1, trimEnd - trimStart);
+  const playbackRate =
+    props.videoPlaybackRate > 0 ? props.videoPlaybackRate : 1;
+
   const userVideoDurationInFrames = Math.max(
     1,
-    Math.round(durationInSeconds * FPS),
+    Math.round((trimmedDurationSeconds / playbackRate) * FPS),
   );
 
   return {
@@ -85,6 +106,10 @@ export const MyComposition = () => {
         outroText: "¡Hasta la próxima!",
         creditsText: "Hecho con Remotion",
         videoFileName: "",
+        videoTrimStartSeconds: 0,
+        videoTrimEndSeconds: 0,
+        videoPlaybackRate: 1,
+        videoOverlayText: "",
         userVideoDurationInFrames: 0,
       }}
       calculateMetadata={calculateMetadata}
@@ -98,6 +123,9 @@ export const MyVideo: React.FC<Props> = ({
   outroText,
   creditsText,
   videoFileName,
+  videoTrimStartSeconds,
+  videoPlaybackRate,
+  videoOverlayText,
   userVideoDurationInFrames,
 }) => {
   const hasUserVideo = userVideoDurationInFrames > 0;
@@ -133,7 +161,12 @@ export const MyVideo: React.FC<Props> = ({
             <TransitionSeries.Sequence
               durationInFrames={userVideoDurationInFrames}
             >
-              <UserVideoScene videoFileName={videoFileName} />
+              <UserVideoScene
+                videoFileName={videoFileName}
+                trimStartSeconds={videoTrimStartSeconds}
+                playbackRate={videoPlaybackRate}
+                overlayText={videoOverlayText}
+              />
             </TransitionSeries.Sequence>
             <TransitionSeries.Transition
               presentation={slide({ direction: "from-left" })}
@@ -283,11 +316,16 @@ const OutroScene: React.FC<{ outroText: string }> = ({ outroText }) => {
 };
 
 // Escena de video propio: el archivo subido por el usuario a public/
-// (vía el panel "Assets" del Studio), mostrado a pantalla completa.
-const UserVideoScene: React.FC<{ videoFileName: string }> = ({
-  videoFileName,
-}) => {
+// (vía el panel "Assets" del Studio), mostrado a pantalla completa, con
+// las "instrucciones" de edición (recorte, velocidad, texto) aplicadas.
+const UserVideoScene: React.FC<{
+  videoFileName: string;
+  trimStartSeconds: number;
+  playbackRate: number;
+  overlayText: string;
+}> = ({ videoFileName, trimStartSeconds, playbackRate, overlayText }) => {
   const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
 
   const opacity = interpolate(frame, [0, 15], [0, 1], {
     extrapolateRight: "clamp",
@@ -297,8 +335,33 @@ const UserVideoScene: React.FC<{ videoFileName: string }> = ({
     <AbsoluteFill style={{ backgroundColor: "black", opacity }}>
       <Video
         src={staticFile(videoFileName)}
+        trimBefore={Math.round(Math.max(0, trimStartSeconds) * fps)}
+        playbackRate={playbackRate > 0 ? playbackRate : 1}
         style={{ width: "100%", height: "100%", objectFit: "contain" }}
       />
+      {overlayText && (
+        <AbsoluteFill
+          style={{
+            justifyContent: "flex-end",
+            alignItems: "center",
+            paddingBottom: 48,
+          }}
+        >
+          <div
+            style={{
+              color: "white",
+              fontSize: 44,
+              fontWeight: "bold",
+              fontFamily: "sans-serif",
+              textAlign: "center",
+              padding: "0 48px",
+              textShadow: "0 2px 10px rgba(0,0,0,0.85)",
+            }}
+          >
+            {overlayText}
+          </div>
+        </AbsoluteFill>
+      )}
     </AbsoluteFill>
   );
 };
