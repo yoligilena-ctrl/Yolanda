@@ -36,6 +36,16 @@ type Props = {
   videoZoomStartSeconds: number;
   videoZoomDurationSeconds: number;
   videoZoomScale: number;
+  // Flecha o círculo resaltado sobre el video, en un momento y posición
+  // dados. videoCalloutDurationSeconds = 0 desactiva el efecto (por
+  // defecto). Posición en porcentaje del cuadro (0-100).
+  videoCalloutType: "arrow" | "circle";
+  videoCalloutStartSeconds: number;
+  videoCalloutDurationSeconds: number;
+  videoCalloutXPercent: number;
+  videoCalloutYPercent: number;
+  videoCalloutDirection: "up" | "down" | "left" | "right";
+  videoCalloutText: string;
   // Calculado automáticamente en calculateMetadata a partir del archivo real
   // y las instrucciones de recorte/velocidad; no se edita a mano.
   userVideoDurationInFrames: number;
@@ -137,6 +147,13 @@ export const MyComposition = () => {
         videoZoomStartSeconds: 0,
         videoZoomDurationSeconds: 0,
         videoZoomScale: 1.5,
+        videoCalloutType: "arrow",
+        videoCalloutStartSeconds: 0,
+        videoCalloutDurationSeconds: 0,
+        videoCalloutXPercent: 50,
+        videoCalloutYPercent: 50,
+        videoCalloutDirection: "up",
+        videoCalloutText: "",
         userVideoDurationInFrames: 0,
         aspectRatio: "landscape",
       }}
@@ -157,6 +174,13 @@ export const MyVideo: React.FC<Props> = ({
   videoZoomStartSeconds,
   videoZoomDurationSeconds,
   videoZoomScale,
+  videoCalloutType,
+  videoCalloutStartSeconds,
+  videoCalloutDurationSeconds,
+  videoCalloutXPercent,
+  videoCalloutYPercent,
+  videoCalloutDirection,
+  videoCalloutText,
   userVideoDurationInFrames,
 }) => {
   const hasUserVideo = userVideoDurationInFrames > 0;
@@ -200,6 +224,13 @@ export const MyVideo: React.FC<Props> = ({
                 zoomStartSeconds={videoZoomStartSeconds}
                 zoomDurationSeconds={videoZoomDurationSeconds}
                 zoomScale={videoZoomScale}
+                calloutType={videoCalloutType}
+                calloutStartSeconds={videoCalloutStartSeconds}
+                calloutDurationSeconds={videoCalloutDurationSeconds}
+                calloutXPercent={videoCalloutXPercent}
+                calloutYPercent={videoCalloutYPercent}
+                calloutDirection={videoCalloutDirection}
+                calloutText={videoCalloutText}
               />
             </TransitionSeries.Sequence>
             <TransitionSeries.Transition
@@ -363,6 +394,13 @@ const UserVideoScene: React.FC<{
   zoomStartSeconds: number;
   zoomDurationSeconds: number;
   zoomScale: number;
+  calloutType: "arrow" | "circle";
+  calloutStartSeconds: number;
+  calloutDurationSeconds: number;
+  calloutXPercent: number;
+  calloutYPercent: number;
+  calloutDirection: "up" | "down" | "left" | "right";
+  calloutText: string;
 }> = ({
   videoFileName,
   trimStartSeconds,
@@ -371,6 +409,13 @@ const UserVideoScene: React.FC<{
   zoomStartSeconds,
   zoomDurationSeconds,
   zoomScale,
+  calloutType,
+  calloutStartSeconds,
+  calloutDurationSeconds,
+  calloutXPercent,
+  calloutYPercent,
+  calloutDirection,
+  calloutText,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -437,6 +482,132 @@ const UserVideoScene: React.FC<{
           </div>
         </AbsoluteFill>
       )}
+      <VideoCallout
+        type={calloutType}
+        startSeconds={calloutStartSeconds}
+        durationSeconds={calloutDurationSeconds}
+        xPercent={calloutXPercent}
+        yPercent={calloutYPercent}
+        direction={calloutDirection}
+        text={calloutText}
+      />
+    </AbsoluteFill>
+  );
+};
+
+// Flecha o círculo resaltado, activable manualmente en un momento y
+// posición del video. Se dibuja fuera del <Video>, así que el zoom no
+// lo afecta (siempre queda anclado al cuadro, no al contenido).
+const VideoCallout: React.FC<{
+  type: "arrow" | "circle";
+  startSeconds: number;
+  durationSeconds: number;
+  xPercent: number;
+  yPercent: number;
+  direction: "up" | "down" | "left" | "right";
+  text: string;
+}> = ({
+  type,
+  startSeconds,
+  durationSeconds,
+  xPercent,
+  yPercent,
+  direction,
+  text,
+}) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const textScale = useTextScale();
+
+  const startFrame = Math.round(Math.max(0, startSeconds) * fps);
+  const durationFrames = Math.round(Math.max(0, durationSeconds) * fps);
+
+  if (durationFrames <= 0) {
+    return null;
+  }
+
+  const endFrame = startFrame + durationFrames;
+  if (frame < startFrame || frame > endFrame) {
+    return null;
+  }
+
+  const localSeconds = (frame - startFrame) / fps;
+  const fadeFrames = Math.min(8, Math.floor(durationFrames / 4));
+  const opacity = interpolate(
+    frame,
+    [startFrame, startFrame + fadeFrames, endFrame - fadeFrames, endFrame],
+    [0, 1, 1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+  // Pulso continuo mientras está visible, para llamar la atención.
+  const pulse = 1 + 0.08 * Math.sin(localSeconds * Math.PI * 3);
+
+  const rotationByDirection: Record<typeof direction, number> = {
+    up: 0,
+    right: 90,
+    down: 180,
+    left: 270,
+  };
+
+  return (
+    <AbsoluteFill style={{ pointerEvents: "none" }}>
+      <div
+        style={{
+          position: "absolute",
+          left: `${xPercent}%`,
+          top: `${yPercent}%`,
+          transform: "translate(-50%, -50%)",
+          opacity,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: 8 * textScale,
+        }}
+      >
+        {type === "arrow" ? (
+          <svg
+            width={70 * textScale}
+            height={90 * textScale}
+            viewBox="0 0 70 90"
+            style={{
+              transform: `rotate(${rotationByDirection[direction]}deg) scale(${pulse})`,
+            }}
+          >
+            <polygon
+              points="35,0 70,40 48,40 48,90 22,90 22,40 0,40"
+              fill="#ffd23f"
+              stroke="black"
+              strokeWidth={3}
+            />
+          </svg>
+        ) : (
+          <div
+            style={{
+              width: 110 * textScale * pulse,
+              height: 110 * textScale * pulse,
+              borderRadius: "50%",
+              border: `${6 * textScale}px solid #ffd23f`,
+              boxShadow: "0 0 20px rgba(255,210,63,0.8)",
+            }}
+          />
+        )}
+        {text && (
+          <div
+            style={{
+              color: "white",
+              backgroundColor: "rgba(0,0,0,0.75)",
+              padding: `${6 * textScale}px ${14 * textScale}px`,
+              borderRadius: 8,
+              fontSize: 28 * textScale,
+              fontWeight: "bold",
+              fontFamily: "sans-serif",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {text}
+          </div>
+        )}
+      </div>
     </AbsoluteFill>
   );
 };
