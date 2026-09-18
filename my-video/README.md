@@ -81,6 +81,31 @@ La duración de la escena se recalcula sola con cada instrucción —
 por ejemplo, si recortas el video a 3 segundos o le pones velocidad
 2x, el resto del video (transiciones, música) se ajusta automático.
 
+### Subtítulos animados (con la API de Whisper de OpenAI)
+
+1. Necesitás [ffmpeg](https://ffmpeg.org/) instalado en tu máquina y una
+   [API key de OpenAI](https://platform.openai.com/api-keys) con acceso
+   a la API de audio.
+2. Corré, desde `my-video/`:
+   ```console
+   OPENAI_API_KEY="sk-..." npm run captions -- mi-video.webm
+   ```
+   Esto extrae el audio, lo transcribe con `whisper-1` (con timestamps
+   por palabra), y guarda `public/mi-video.captions.json`.
+3. En el panel de props, poné `videoCaptionsFileName` como
+   `"mi-video.captions.json"`.
+
+Los subtítulos aparecen agrupados por frase, resaltando la palabra que
+se está diciendo en ese momento (estilo TikTok) — **solo mientras hay
+voz**; en los silencios no se muestra nada. Si le pusiste recorte
+(`videoTrimStartSeconds`) o velocidad (`videoPlaybackRate`) al video, la
+sincronización de los subtítulos se ajusta sola.
+
+**Importante:** `api.openai.com` está bloqueado en este entorno de
+sandbox (mismo tipo de restricción de red que bloquea Hugging Face y
+GitHub Releases), así que `npm run captions` no va a funcionar acá —
+corrélo en tu propia máquina o en un entorno sin esa restricción.
+
 **Importante sobre formatos:** en este entorno de sandbox, el
 navegador headless usado para previsualizar y renderizar no tiene
 soporte para H.264 (`.mp4` común de celulares/cámaras). Usa
