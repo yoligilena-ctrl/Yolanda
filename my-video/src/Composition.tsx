@@ -45,7 +45,7 @@ export const MyComposition = () => {
       height={720}
       defaultProps={{
         titleText: "Yolanda Video Generator",
-        subtitleText: "Escenas, transiciones y música — todo con código",
+        subtitleText: "Hecho 100% con código",
         outroText: "¡Nos vemos pronto!",
       }}
       calculateMetadata={calculateMetadata}
