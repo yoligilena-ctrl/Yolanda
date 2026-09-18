@@ -112,6 +112,46 @@ soporte para H.264 (`.mp4` común de celulares/cámaras). Usa
 `.webm` (VP8/VP9) para que funcione aquí. En tu propia máquina, con
 Chrome normal, `.mp4` debería funcionar sin problemas.
 
+### Cortes automáticos por silencio
+
+Si tu video tiene pausas largas (silencios entre frases), podés generar
+una copia con esos tramos recortados automáticamente — **100% local con
+ffmpeg, sin ninguna API externa**, así que funciona en cualquier entorno:
+
+1. Necesitás [ffmpeg](https://ffmpeg.org/) instalado en tu máquina y en
+   el `PATH`.
+2. Subí tu video a `public/` (ver "Usar tu propio video" más arriba).
+3. Corré, desde `my-video/`:
+   ```console
+   npm run cut-silence -- mi-video.webm
+   ```
+   Esto detecta los tramos de silencio con `ffmpeg silencedetect` y
+   genera `public/mi-video.cuts.webm` (o `.mp4`, según la extensión de
+   entrada) con esos tramos quitados, dejando el resto del audio y video
+   pegado sin cortes.
+4. En el panel de props, poné `videoFileName` como
+   `"mi-video.cuts.webm"` — el resto de las instrucciones (zoom,
+   callouts, subtítulos, overlay) funcionan igual sobre el video ya
+   recortado.
+
+Parámetros opcionales:
+
+- `--threshold=-30`: qué tan silencioso (en dB) tiene que ser el audio
+  para contar como silencio. Más negativo = más estricto (detecta
+  menos silencios). Si tu video tiene ruido de fondo y no detecta
+  pausas, probá `--threshold=-40`.
+- `--min-silence=0.6`: duración mínima en segundos para que una pausa
+  cuente como silencio a cortar (evita cortar micro-pausas normales
+  del habla).
+- `--padding=0.15`: cuántos segundos de silencio dejar pegados a cada
+  lado del corte, para no comerse el inicio/final de una palabra.
+
+Ejemplo con parámetros ajustados:
+
+```console
+npm run cut-silence -- mi-video.webm --threshold=-35 --min-silence=0.8 --padding=0.1
+```
+
 ## Exportar para CapCut
 
 CapCut **no tiene un formato de proyecto abierto ni documentado**

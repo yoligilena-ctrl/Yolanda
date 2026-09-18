@@ -30,7 +30,8 @@
     "build": "remotion bundle",
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc",
-    "captions": "node scripts/generate-captions.mjs"
+    "captions": "node scripts/generate-captions.mjs",
+    "cut-silence": "node scripts/cut-silence.mjs"
   },
   "sideEffects": [
     "*.css"
