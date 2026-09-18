@@ -44,9 +44,9 @@ export const MyComposition = () => {
       width={1280}
       height={720}
       defaultProps={{
-        titleText: "Mi Video con Remotion",
-        subtitleText: "Creado 100% con código",
-        outroText: "¡Gracias por ver!",
+        titleText: "Yolanda Video Generator",
+        subtitleText: "Escenas, transiciones y música — todo con código",
+        outroText: "¡Nos vemos pronto!",
       }}
       calculateMetadata={calculateMetadata}
     />
