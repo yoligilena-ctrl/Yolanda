@@ -31,7 +31,8 @@
     "upgrade": "remotion upgrade",
     "lint": "eslint src && tsc",
     "captions": "node scripts/generate-captions.mjs",
-    "cut-silence": "node scripts/cut-silence.mjs"
+    "cut-silence": "node scripts/cut-silence.mjs",
+    "analyze": "node scripts/analyze-video.mjs"
   },
   "sideEffects": [
     "*.css"

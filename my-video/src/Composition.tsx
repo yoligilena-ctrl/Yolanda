@@ -57,6 +57,16 @@ type Props = {
   // agrupados por frase/pausa natural, solo mientras hay voz — no todo
   // el video tiene texto encima todo el tiempo.
   videoCaptionsFileName: string;
+  // Plan de edición: nombre del archivo <video>.editplan.json en public/
+  // (generado con `npm run analyze -- <video>`), con la lista de frases
+  // "importantes" que decidió el motor de reglas. Vacío = se muestran
+  // todos los subtítulos (comportamiento por defecto, sin filtrar). Con un
+  // plan puesto, los subtítulos SOLO aparecen en esas frases.
+  videoEditPlanFileName: string;
+  // Corrección de color: aplica un look profesional sobre el video tal
+  // cual está (no modifica el archivo original, es un filtro en pantalla).
+  // "none" = sin cambios (por defecto).
+  videoColorGrade: "none" | "cinematic" | "warm" | "cool" | "bw";
   // Calculado automáticamente en calculateMetadata a partir del archivo real
   // y las instrucciones de recorte/velocidad; no se edita a mano.
   userVideoDurationInFrames: number;
@@ -95,6 +105,18 @@ const BASE_DURATION =
   OUTRO_DURATION +
   CREDITS_DURATION -
   3 * TRANSITION_DURATION; // 11s
+
+// Corrección de color: combinaciones de filtros CSS estándar (sin LUTs, sin
+// tocar el archivo original) que imitan looks de edición profesional.
+const COLOR_GRADE_FILTERS: Record<Props["videoColorGrade"], string> = {
+  none: "none",
+  // Más contraste y saturación, un pelín de calidez y una leve viñeta
+  // (agregada aparte, ver más abajo) — el look "cine" clásico.
+  cinematic: "contrast(1.15) saturate(1.25) brightness(1.03) sepia(0.08) hue-rotate(-6deg)",
+  warm: "contrast(1.05) saturate(1.15) brightness(1.06) sepia(0.2) hue-rotate(-8deg)",
+  cool: "contrast(1.08) saturate(1.1) brightness(1.0) hue-rotate(10deg)",
+  bw: "grayscale(1) contrast(1.15) brightness(1.05)",
+};
 
 const calculateMetadata: CalculateMetadataFunction<Props> = async ({
   props,
@@ -166,6 +188,8 @@ export const MyComposition = () => {
         videoCalloutDirection: "up",
         videoCalloutText: "",
         videoCaptionsFileName: "",
+        videoEditPlanFileName: "",
+        videoColorGrade: "none",
         userVideoDurationInFrames: 0,
         aspectRatio: "landscape",
       }}
@@ -194,6 +218,8 @@ export const MyVideo: React.FC<Props> = ({
   videoCalloutDirection,
   videoCalloutText,
   videoCaptionsFileName,
+  videoEditPlanFileName,
+  videoColorGrade,
   userVideoDurationInFrames,
 }) => {
   const hasUserVideo = userVideoDurationInFrames > 0;
@@ -245,6 +271,8 @@ export const MyVideo: React.FC<Props> = ({
                 calloutDirection={videoCalloutDirection}
                 calloutText={videoCalloutText}
                 captionsFileName={videoCaptionsFileName}
+                editPlanFileName={videoEditPlanFileName}
+                colorGrade={videoColorGrade}
               />
             </TransitionSeries.Sequence>
             <TransitionSeries.Transition
@@ -416,6 +444,8 @@ const UserVideoScene: React.FC<{
   calloutDirection: "up" | "down" | "left" | "right";
   calloutText: string;
   captionsFileName: string;
+  editPlanFileName: string;
+  colorGrade: "none" | "cinematic" | "warm" | "cool" | "bw";
 }> = ({
   videoFileName,
   trimStartSeconds,
@@ -432,6 +462,8 @@ const UserVideoScene: React.FC<{
   calloutDirection,
   calloutText,
   captionsFileName,
+  editPlanFileName,
+  colorGrade,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -473,8 +505,18 @@ const UserVideoScene: React.FC<{
           height: "100%",
           objectFit: "contain",
           transform: `scale(${videoScale})`,
+          filter: COLOR_GRADE_FILTERS[colorGrade],
         }}
       />
+      {colorGrade === "cinematic" && (
+        <AbsoluteFill
+          style={{
+            background:
+              "radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.38) 100%)",
+            pointerEvents: "none",
+          }}
+        />
+      )}
       {overlayText && (
         <AbsoluteFill
           style={{
@@ -510,6 +552,7 @@ const UserVideoScene: React.FC<{
       {captionsFileName && (
         <AnimatedCaptions
           captionsFileName={captionsFileName}
+          editPlanFileName={editPlanFileName}
           trimStartSeconds={trimStartSeconds}
           playbackRate={playbackRate > 0 ? playbackRate : 1}
         />
@@ -640,15 +683,20 @@ const VideoCallout: React.FC<{
 // que llama a la API de Whisper de OpenAI). Se agrupan por frase/pausa
 // natural y solo aparecen mientras hay voz — no todo el video tiene
 // texto encima todo el tiempo.
+type EditPlanHighlight = { text: string; startMs: number; endMs: number };
+type EditPlan = { highlights: EditPlanHighlight[] };
+
 const AnimatedCaptions: React.FC<{
   captionsFileName: string;
+  editPlanFileName: string;
   trimStartSeconds: number;
   playbackRate: number;
-}> = ({ captionsFileName, trimStartSeconds, playbackRate }) => {
+}> = ({ captionsFileName, editPlanFileName, trimStartSeconds, playbackRate }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const textScale = useTextScale();
   const [captions, setCaptions] = useState<Caption[] | null>(null);
+  const [editPlan, setEditPlan] = useState<EditPlan | null>(null);
 
   useEffect(() => {
     const handle = delayRender(`Cargando subtítulos: ${captionsFileName}`);
@@ -678,6 +726,40 @@ const AnimatedCaptions: React.FC<{
     };
   }, [captionsFileName]);
 
+  // Plan de edición opcional (ver scripts/analyze-video.mjs): si está
+  // presente, filtra qué frases de los subtítulos se llegan a mostrar.
+  useEffect(() => {
+    if (!editPlanFileName) {
+      setEditPlan(null);
+      return;
+    }
+    const handle = delayRender(`Cargando plan de edición: ${editPlanFileName}`);
+    let cancelled = false;
+
+    fetch(staticFile(editPlanFileName))
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(
+            `No se pudo cargar ${editPlanFileName} (HTTP ${res.status})`,
+          );
+        }
+        return res.json();
+      })
+      .then((data: EditPlan) => {
+        if (!cancelled) {
+          setEditPlan(data);
+        }
+        continueRender(handle);
+      })
+      .catch((err) => {
+        cancelRender(err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [editPlanFileName]);
+
   if (!captions || captions.length === 0) {
     return null;
   }
@@ -692,13 +774,27 @@ const AnimatedCaptions: React.FC<{
     combineTokensWithinMilliseconds: 4000,
   });
 
+  // Sin plan de edición: se muestran todas las páginas (comportamiento de
+  // siempre). Con plan: solo las páginas que se superponen con alguna
+  // frase marcada como importante.
+  const visiblePages =
+    editPlanFileName && editPlan
+      ? pages.filter((page) =>
+          editPlan.highlights.some(
+            (h) =>
+              page.startMs < h.endMs &&
+              page.startMs + page.durationMs > h.startMs,
+          ),
+        )
+      : pages;
+
   // Los timestamps de los subtítulos son del archivo original sin
   // recortar; hay que convertir el frame actual de la escena a "tiempo
   // dentro del archivo original" aplicando el recorte y la velocidad.
   const originalMs =
     trimStartSeconds * 1000 + (frame / fps) * 1000 * playbackRate;
 
-  const activePage = pages.find(
+  const activePage = visiblePages.find(
     (page) =>
       originalMs >= page.startMs &&
       originalMs < page.startMs + page.durationMs,
