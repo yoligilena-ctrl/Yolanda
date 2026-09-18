@@ -9,6 +9,7 @@ import {
   AbsoluteFill,
   Audio,
   Video,
+  Img,
   staticFile,
   delayRender,
   continueRender,
@@ -67,6 +68,12 @@ type Props = {
   // cual está (no modifica el archivo original, es un filtro en pantalla).
   // "none" = sin cambios (por defecto).
   videoColorGrade: "none" | "cinematic" | "warm" | "cool" | "bw";
+  // B-roll: nombre del archivo <video>.broll.json en public/, con una
+  // lista de clips/imágenes de apoyo propios para insertar en momentos
+  // puntuales (ver README). Vacío = sin B-roll. No hay nada automático acá
+  // — la lista la arma el usuario a mano, indicando qué archivo mostrar y
+  // cuándo.
+  videoBRollFileName: string;
   // Calculado automáticamente en calculateMetadata a partir del archivo real
   // y las instrucciones de recorte/velocidad; no se edita a mano.
   userVideoDurationInFrames: number;
@@ -190,6 +197,7 @@ export const MyComposition = () => {
         videoCaptionsFileName: "",
         videoEditPlanFileName: "",
         videoColorGrade: "none",
+        videoBRollFileName: "",
         userVideoDurationInFrames: 0,
         aspectRatio: "landscape",
       }}
@@ -220,6 +228,7 @@ export const MyVideo: React.FC<Props> = ({
   videoCaptionsFileName,
   videoEditPlanFileName,
   videoColorGrade,
+  videoBRollFileName,
   userVideoDurationInFrames,
 }) => {
   const hasUserVideo = userVideoDurationInFrames > 0;
@@ -273,6 +282,7 @@ export const MyVideo: React.FC<Props> = ({
                 captionsFileName={videoCaptionsFileName}
                 editPlanFileName={videoEditPlanFileName}
                 colorGrade={videoColorGrade}
+                brollFileName={videoBRollFileName}
               />
             </TransitionSeries.Sequence>
             <TransitionSeries.Transition
@@ -446,6 +456,7 @@ const UserVideoScene: React.FC<{
   captionsFileName: string;
   editPlanFileName: string;
   colorGrade: "none" | "cinematic" | "warm" | "cool" | "bw";
+  brollFileName: string;
 }> = ({
   videoFileName,
   trimStartSeconds,
@@ -464,6 +475,7 @@ const UserVideoScene: React.FC<{
   captionsFileName,
   editPlanFileName,
   colorGrade,
+  brollFileName,
 }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -516,6 +528,9 @@ const UserVideoScene: React.FC<{
             pointerEvents: "none",
           }}
         />
+      )}
+      {brollFileName && (
+        <BRoll fileName={brollFileName} colorGrade={colorGrade} />
       )}
       {overlayText && (
         <AbsoluteFill
@@ -673,6 +688,141 @@ const VideoCallout: React.FC<{
             {text}
           </div>
         )}
+      </div>
+    </AbsoluteFill>
+  );
+};
+
+type BRollInsertion = {
+  assetFileName: string;
+  startSeconds: number;
+  durationSeconds: number;
+  // "full": tapa toda la pantalla (cutaway clásico — el audio del video
+  // principal sigue sonando abajo). "pip": recuadro superpuesto en una
+  // esquina, mientras se sigue viendo el video principal atrás.
+  style: "full" | "pip";
+  xPercent?: number;
+  yPercent?: number;
+  widthPercent?: number;
+};
+type BRollPlan = { insertions: BRollInsertion[] };
+
+const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
+
+// B-roll: clips o imágenes de apoyo propios, insertados en momentos
+// puntuales según un archivo <video>.broll.json en public/ (ver README —
+// la lista de inserciones se arma a mano, no hay selección automática de
+// contenido). Los tiempos son relativos a la escena del video ya recortado
+// (igual que zoom/callout), no al archivo original.
+const BRoll: React.FC<{
+  fileName: string;
+  colorGrade: "none" | "cinematic" | "warm" | "cool" | "bw";
+}> = ({ fileName, colorGrade }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const [plan, setPlan] = useState<BRollPlan | null>(null);
+
+  useEffect(() => {
+    const handle = delayRender(`Cargando plan de B-roll: ${fileName}`);
+    let cancelled = false;
+
+    fetch(staticFile(fileName))
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`No se pudo cargar ${fileName} (HTTP ${res.status})`);
+        }
+        return res.json();
+      })
+      .then((data: BRollPlan) => {
+        if (!cancelled) {
+          setPlan(data);
+        }
+        continueRender(handle);
+      })
+      .catch((err) => {
+        cancelRender(err);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [fileName]);
+
+  if (!plan || plan.insertions.length === 0) {
+    return null;
+  }
+
+  const active = plan.insertions.find((insertion) => {
+    const startFrame = Math.round(Math.max(0, insertion.startSeconds) * fps);
+    const durationFrames = Math.round(
+      Math.max(0, insertion.durationSeconds) * fps,
+    );
+    return frame >= startFrame && frame < startFrame + durationFrames;
+  });
+
+  if (!active) {
+    return null;
+  }
+
+  const startFrame = Math.round(Math.max(0, active.startSeconds) * fps);
+  const durationFrames = Math.round(Math.max(0, active.durationSeconds) * fps);
+  const endFrame = startFrame + durationFrames;
+  const fadeFrames = Math.min(8, Math.floor(durationFrames / 4));
+  const opacity = interpolate(
+    frame,
+    [startFrame, startFrame + fadeFrames, endFrame - fadeFrames, endFrame],
+    [0, 1, 1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+  );
+
+  const isImage = IMAGE_EXTENSIONS.some((ext) =>
+    active.assetFileName.toLowerCase().endsWith(ext),
+  );
+
+  const mediaStyle = { filter: COLOR_GRADE_FILTERS[colorGrade] };
+
+  const media = isImage ? (
+    <Img
+      src={staticFile(active.assetFileName)}
+      style={{ width: "100%", height: "100%", objectFit: "cover", ...mediaStyle }}
+    />
+  ) : (
+    <Video
+      src={staticFile(active.assetFileName)}
+      style={{ width: "100%", height: "100%", objectFit: "cover", ...mediaStyle }}
+    />
+  );
+
+  if (active.style === "full") {
+    return (
+      <AbsoluteFill style={{ opacity, backgroundColor: "black" }}>
+        {media}
+      </AbsoluteFill>
+    );
+  }
+
+  const widthPercent = active.widthPercent ?? 35;
+  const xPercent = active.xPercent ?? 72;
+  const yPercent = active.yPercent ?? 72;
+
+  return (
+    <AbsoluteFill style={{ pointerEvents: "none" }}>
+      <div
+        style={{
+          position: "absolute",
+          left: `${xPercent}%`,
+          top: `${yPercent}%`,
+          transform: "translate(-50%, -50%)",
+          width: `${widthPercent}%`,
+          aspectRatio: "16 / 9",
+          opacity,
+          borderRadius: 10,
+          overflow: "hidden",
+          border: "3px solid white",
+          boxShadow: "0 6px 24px rgba(0,0,0,0.5)",
+        }}
+      >
+        {media}
       </div>
     </AbsoluteFill>
   );
