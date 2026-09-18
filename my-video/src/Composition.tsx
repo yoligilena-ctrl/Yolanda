@@ -7,21 +7,27 @@ import {
   spring,
   AbsoluteFill,
   Audio,
+  Video,
   staticFile,
 } from "remotion";
 import { TransitionSeries, linearTiming } from "@remotion/transitions";
 import { slide } from "@remotion/transitions/slide";
+import { getVideoMetadata } from "@remotion/media-utils";
 
 type Props = {
   titleText: string;
   subtitleText: string;
   outroText: string;
   creditsText: string;
+  // Nombre del archivo subido a public/ (vía el panel "Assets" del Studio).
+  // Vacío = no hay video propio, esa escena simplemente no aparece.
+  videoFileName: string;
+  // Calculado automáticamente en calculateMetadata a partir del archivo real;
+  // no se edita a mano.
+  userVideoDurationInFrames: number;
 };
 
-const calculateMetadata: CalculateMetadataFunction<Props> = () => {
-  return {};
-};
+const FPS = 30;
 
 // Duración de cada escena, en frames (30 fps)
 const INTRO_DURATION = 90; // 3s
@@ -30,19 +36,46 @@ const OUTRO_DURATION = 90; // 3s
 const CREDITS_DURATION = 90; // 3s
 // Cada crossfade "muerde" frames de las dos escenas que une
 const TRANSITION_DURATION = 15; // 0.5s
-const TOTAL_DURATION =
+// Duración total sin video propio (4 escenas, 3 transiciones)
+const BASE_DURATION =
   INTRO_DURATION +
   SUBTITLE_DURATION +
   OUTRO_DURATION +
   CREDITS_DURATION -
   3 * TRANSITION_DURATION; // 11s
 
+const calculateMetadata: CalculateMetadataFunction<Props> = async ({
+  props,
+}) => {
+  if (!props.videoFileName) {
+    return {
+      durationInFrames: BASE_DURATION,
+      props: { ...props, userVideoDurationInFrames: 0 },
+    };
+  }
+
+  const { durationInSeconds } = await getVideoMetadata(
+    staticFile(props.videoFileName),
+  );
+  const userVideoDurationInFrames = Math.max(
+    1,
+    Math.round(durationInSeconds * FPS),
+  );
+
+  return {
+    // Se agrega una escena y una transición más cuando hay video propio.
+    durationInFrames:
+      BASE_DURATION + userVideoDurationInFrames - TRANSITION_DURATION,
+    props: { ...props, userVideoDurationInFrames },
+  };
+};
+
 export const MyComposition = () => {
   return (
     <Composition
       id="MyComp"
       component={MyVideo}
-      durationInFrames={TOTAL_DURATION}
+      durationInFrames={BASE_DURATION}
       fps={30}
       width={1280}
       height={720}
@@ -51,6 +84,8 @@ export const MyComposition = () => {
         subtitleText: "Hecho 100% con código",
         outroText: "¡Hasta la próxima!",
         creditsText: "Hecho con Remotion",
+        videoFileName: "",
+        userVideoDurationInFrames: 0,
       }}
       calculateMetadata={calculateMetadata}
     />
@@ -62,7 +97,14 @@ export const MyVideo: React.FC<Props> = ({
   subtitleText,
   outroText,
   creditsText,
+  videoFileName,
+  userVideoDurationInFrames,
 }) => {
+  const hasUserVideo = userVideoDurationInFrames > 0;
+  const totalDuration =
+    BASE_DURATION +
+    (hasUserVideo ? userVideoDurationInFrames - TRANSITION_DURATION : 0);
+
   return (
     <AbsoluteFill>
       <Audio
@@ -70,10 +112,12 @@ export const MyVideo: React.FC<Props> = ({
         volume={(frame) =>
           // Sube poco a poco durante casi todo el video y se
           // desvanece rápido en los últimos frames para evitar un corte seco.
-          interpolate(frame, [0, TOTAL_DURATION - 10, TOTAL_DURATION], [0, 0.3, 0], {
-            extrapolateLeft: "clamp",
-            extrapolateRight: "clamp",
-          })
+          interpolate(
+            frame,
+            [0, totalDuration - 10, totalDuration],
+            [0, 0.3, 0],
+            { extrapolateLeft: "clamp", extrapolateRight: "clamp" },
+          )
         }
       />
       <TransitionSeries>
@@ -84,6 +128,19 @@ export const MyVideo: React.FC<Props> = ({
           presentation={slide({ direction: "from-left" })}
           timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
         />
+        {hasUserVideo && (
+          <>
+            <TransitionSeries.Sequence
+              durationInFrames={userVideoDurationInFrames}
+            >
+              <UserVideoScene videoFileName={videoFileName} />
+            </TransitionSeries.Sequence>
+            <TransitionSeries.Transition
+              presentation={slide({ direction: "from-left" })}
+              timing={linearTiming({ durationInFrames: TRANSITION_DURATION })}
+            />
+          </>
+        )}
         <TransitionSeries.Sequence durationInFrames={SUBTITLE_DURATION}>
           <SubtitleScene subtitleText={subtitleText} />
         </TransitionSeries.Sequence>
@@ -221,6 +278,27 @@ const OutroScene: React.FC<{ outroText: string }> = ({ outroText }) => {
       >
         {outroText}
       </div>
+    </AbsoluteFill>
+  );
+};
+
+// Escena de video propio: el archivo subido por el usuario a public/
+// (vía el panel "Assets" del Studio), mostrado a pantalla completa.
+const UserVideoScene: React.FC<{ videoFileName: string }> = ({
+  videoFileName,
+}) => {
+  const frame = useCurrentFrame();
+
+  const opacity = interpolate(frame, [0, 15], [0, 1], {
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <AbsoluteFill style={{ backgroundColor: "black", opacity }}>
+      <Video
+        src={staticFile(videoFileName)}
+        style={{ width: "100%", height: "100%", objectFit: "contain" }}
+      />
     </AbsoluteFill>
   );
 };
