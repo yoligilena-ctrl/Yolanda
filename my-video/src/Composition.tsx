@@ -83,7 +83,7 @@ type Props = {
   // Corrección de color: aplica un look profesional sobre el video tal
   // cual está (no modifica el archivo original, es un filtro en pantalla).
   // "none" = sin cambios (por defecto).
-  videoColorGrade: "none" | "cinematic" | "warm" | "cool" | "bw";
+  videoColorGrade: "none" | "cinematic" | "vibrant" | "warm" | "cool" | "bw";
   // B-roll: nombre del archivo <video>.broll.json en public/, con una
   // lista de clips/imágenes de apoyo propios para insertar en momentos
   // puntuales (ver README). Vacío = sin B-roll. No hay nada automático acá
@@ -148,6 +148,10 @@ const COLOR_GRADE_FILTERS: Record<Props["videoColorGrade"], string> = {
   // Más contraste y saturación, un pelín de calidez y una leve viñeta
   // (agregada aparte, ver más abajo) — el look "cine" clásico.
   cinematic: "contrast(1.15) saturate(1.25) brightness(1.03) sepia(0.08) hue-rotate(-6deg)",
+  // Look energético para redes: mucho más saturado y contrastado que
+  // "cinematic" (que es más apagado/moody), sin viñeta — pensado para
+  // que el video "explote" en un feed en vez de sentirse sutil.
+  vibrant: "contrast(1.3) saturate(1.6) brightness(1.08) hue-rotate(-2deg)",
   warm: "contrast(1.05) saturate(1.15) brightness(1.06) sepia(0.2) hue-rotate(-8deg)",
   cool: "contrast(1.08) saturate(1.1) brightness(1.0) hue-rotate(10deg)",
   bw: "grayscale(1) contrast(1.15) brightness(1.05)",
@@ -635,7 +639,7 @@ const UserVideoScene: React.FC<{
   calloutText: string;
   captionsFileName: string;
   editPlanFileName: string;
-  colorGrade: "none" | "cinematic" | "warm" | "cool" | "bw";
+  colorGrade: "none" | "cinematic" | "vibrant" | "warm" | "cool" | "bw";
   brollFileName: string;
 }> = ({
   videoFileName,
@@ -814,6 +818,14 @@ const VideoCallout: React.FC<{
   );
   // Pulso continuo mientras está visible, para llamar la atención.
   const pulse = 1 + 0.08 * Math.sin(localSeconds * Math.PI * 3);
+  // Entrada con rebote (en vez de solo un fade) — se "dispara" con
+  // sobresalto y se asienta, mucho más notorio que aparecer sin más.
+  const entranceScale = spring({
+    frame: Math.max(0, frame - startFrame),
+    fps,
+    config: { damping: 9, stiffness: 300, mass: 0.5 },
+  });
+  const bounceScale = pulse * entranceScale;
 
   const rotationByDirection: Record<typeof direction, number> = {
     up: 0,
@@ -843,7 +855,7 @@ const VideoCallout: React.FC<{
             height={90 * textScale}
             viewBox="0 0 70 90"
             style={{
-              transform: `rotate(${rotationByDirection[direction]}deg) scale(${pulse})`,
+              transform: `rotate(${rotationByDirection[direction]}deg) scale(${bounceScale})`,
             }}
           >
             <polygon
@@ -856,8 +868,8 @@ const VideoCallout: React.FC<{
         ) : (
           <div
             style={{
-              width: 110 * textScale * pulse,
-              height: 110 * textScale * pulse,
+              width: 110 * textScale * bounceScale,
+              height: 110 * textScale * bounceScale,
               borderRadius: "50%",
               border: `${6 * textScale}px solid #ffd23f`,
               boxShadow: "0 0 20px rgba(255,210,63,0.8)",
@@ -908,7 +920,7 @@ const IMAGE_EXTENSIONS = [".png", ".jpg", ".jpeg", ".webp", ".gif"];
 // (igual que zoom/callout), no al archivo original.
 const BRoll: React.FC<{
   fileName: string;
-  colorGrade: "none" | "cinematic" | "warm" | "cool" | "bw";
+  colorGrade: "none" | "cinematic" | "vibrant" | "warm" | "cool" | "bw";
 }> = ({ fileName, colorGrade }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
@@ -1151,7 +1163,7 @@ const AnimatedCaptions: React.FC<{
       style={{
         justifyContent: "flex-end",
         alignItems: "center",
-        paddingBottom: 140,
+        paddingBottom: 150,
       }}
     >
       <div
@@ -1159,27 +1171,54 @@ const AnimatedCaptions: React.FC<{
           display: "flex",
           flexWrap: "wrap",
           justifyContent: "center",
-          gap: `${4 * textScale}px ${10 * textScale}px`,
-          maxWidth: "85%",
-          padding: `${10 * textScale}px ${18 * textScale}px`,
-          backgroundColor: "rgba(0,0,0,0.55)",
-          borderRadius: 12,
+          alignItems: "center",
+          gap: `${6 * textScale}px ${12 * textScale}px`,
+          maxWidth: "82%",
         }}
       >
         {activePage.tokens.map((token, index) => {
           const isActive =
             originalMs >= token.fromMs && originalMs < token.toMs;
+
+          // Rebote de entrada de la palabra activa: en vez de un fundido
+          // suave, un "pop" con leve sobresalto — el estilo de resaltado
+          // por palabra de CapCut/Opus/Submagic, no un simple cambio de
+          // color.
+          const activationFrame =
+            (token.fromMs / 1000 - trimStartSeconds) * (fps / playbackRate);
+          const pop = isActive
+            ? spring({
+                frame: Math.max(0, frame - activationFrame),
+                fps,
+                config: { damping: 11, stiffness: 260, mass: 0.6 },
+              })
+            : 0;
+          const scale = isActive ? 0.75 + pop * 0.35 : 1;
+          const translateY = isActive ? (1 - pop) * 10 : 0;
+
           return (
             <span
               key={`${token.fromMs}-${index}`}
               style={{
-                fontSize: 40 * textScale,
-                fontWeight: "bold",
+                fontSize: 46 * textScale,
+                fontWeight: 800,
                 fontFamily: "sans-serif",
-                color: isActive ? "#ffd23f" : "white",
-                transform: isActive ? "scale(1.08)" : "scale(1)",
                 display: "inline-block",
-                textShadow: "0 2px 8px rgba(0,0,0,0.85)",
+                transform: `scale(${scale}) translateY(${translateY}px)`,
+                ...(isActive
+                  ? {
+                      color: "#0b1020",
+                      backgroundColor: "#ffd23f",
+                      padding: `${2 * textScale}px ${12 * textScale}px`,
+                      borderRadius: 10 * textScale,
+                      boxShadow: "0 4px 14px rgba(0,0,0,0.45)",
+                    }
+                  : {
+                      color: "white",
+                      textShadow:
+                        "0 2px 4px rgba(0,0,0,0.9), 0 0 18px rgba(0,0,0,0.6)",
+                      WebkitTextStroke: "1.5px rgba(0,0,0,0.55)",
+                    }),
               }}
             >
               {token.text}
