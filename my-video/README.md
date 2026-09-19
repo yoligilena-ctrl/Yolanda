@@ -97,9 +97,10 @@ edición, sin tocar código:
   `videoCalloutDurationSeconds`, `videoCalloutXPercent`/`YPercent`
   (posición, 0-100), `videoCalloutDirection` (`"up"`/`"down"`/`"left"`/`"right"`,
   solo para `arrow`), `videoCalloutText` (etiqueta opcional): flecha o
-  círculo resaltado en un momento y lugar del video, con pulso continuo
-  mientras está visible. `videoCalloutDurationSeconds` en `0` desactiva
-  el efecto (por defecto).
+  círculo resaltado en un momento y lugar del video, que entra con un
+  rebote (spring) y después queda con un pulso continuo mientras está
+  visible. `videoCalloutDurationSeconds` en `0` desactiva el efecto
+  (por defecto).
 
 La duración de la escena se recalcula sola con cada instrucción —
 por ejemplo, si recortas el video a 3 segundos o le pones velocidad
@@ -162,11 +163,12 @@ composición (título → video → subtítulo → cierre → créditos):
 3. En el panel de props, poné `videoCaptionsFileName` como
    `"mi-video.captions.json"`.
 
-Los subtítulos aparecen agrupados por frase, resaltando la palabra que
-se está diciendo en ese momento (estilo TikTok) — **solo mientras hay
-voz**; en los silencios no se muestra nada. Si le pusiste recorte
-(`videoTrimStartSeconds`) o velocidad (`videoPlaybackRate`) al video, la
-sincronización de los subtítulos se ajusta sola.
+Los subtítulos aparecen agrupados por frase, con la palabra que se está
+diciendo en ese momento resaltada con una "pastilla" de color y un
+pequeño rebote de entrada (estilo CapCut/Opus/Submagic) — **solo
+mientras hay voz**; en los silencios no se muestra nada. Si le pusiste
+recorte (`videoTrimStartSeconds`) o velocidad (`videoPlaybackRate`) al
+video, la sincronización de los subtítulos se ajusta sola.
 
 **Videos largos:** la API de Whisper rechaza archivos de audio de más de
 25MB (límite de OpenAI, no de este proyecto) — un video de más o menos
@@ -246,6 +248,8 @@ externos):
 - `"none"` (por defecto): sin cambios.
 - `"cinematic"`: más contraste y saturación, un toque de calidez y una
   viñeta suave en los bordes — el look "cine" clásico.
+- `"vibrant"`: contraste y saturación altos, sin viñeta — un look más
+  energético para reels/shorts, sin el aire "de cine" de `cinematic`.
 - `"warm"`: más cálido (naranja/piel), sin viñeta.
 - `"cool"`: tono más frío/azulado.
 - `"bw"`: blanco y negro con contraste realzado.
